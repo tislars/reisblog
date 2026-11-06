@@ -14,6 +14,10 @@ describe('coordsFor', () => {
     expect(lookup).not.toHaveBeenCalled();
   });
 
+  it('treats null lat/lng from the CMS as empty', async () => {
+    expect(await coordsFor({ place: 'Hanoi', lat: null, lng: null }, vi.fn())).toEqual({ lat: 21.03, lng: 105.85 });
+  });
+
   it('serves cached places case-insensitively without a lookup', async () => {
     const lookup = vi.fn();
     expect(await coordsFor({ place: ' Hanoi ' }, lookup)).toEqual({ lat: 21.03, lng: 105.85 });

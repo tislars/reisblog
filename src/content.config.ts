@@ -8,9 +8,9 @@ const posts = defineCollection({
     title: z.string(),
     date: z.coerce.date(),
     place: z.string().min(1),
-    lat: z.number().min(-90).max(90).optional(),
-    lng: z.number().min(-180).max(180).optional(),
-    cover: z.string().optional(),
+    lat: z.number().min(-90).max(90).nullish(),
+    lng: z.number().min(-180).max(180).nullish(),
+    cover: z.string().nullish(),
     draft: z.boolean().default(false),
   }),
 });

@@ -41,10 +41,10 @@ const nominatim: Lookup = async (place) => {
 };
 
 export async function coordsFor(
-  post: { place: string; lat?: number; lng?: number },
+  post: { place: string; lat?: number | null; lng?: number | null },
   lookup: Lookup = nominatim,
 ): Promise<Coords> {
-  if (post.lat !== undefined && post.lng !== undefined) return roundCoords({ lat: post.lat, lng: post.lng });
+  if (post.lat != null && post.lng != null) return roundCoords({ lat: post.lat, lng: post.lng });
 
   const cache = await loadCache();
   const key = cacheKey(post.place);
