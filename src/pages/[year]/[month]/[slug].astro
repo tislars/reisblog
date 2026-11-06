@@ -1,0 +1,172 @@
+---
+import 'photoswipe/style.css';
+import Base from '../../../layouts/Base.astro';
+import { embedFlickrPhotos, getPhoto } from '../../../lib/flickr';
+import { formatDate, getPosts, withBase, type Post } from '../../../lib/posts';
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  return posts.map((post, i) => ({
+    params: { year: post.year, month: post.month, slug: post.slug },
+    props: { post, prev: posts[i - 1], next: posts[i + 1] },
+  }));
+}
+
+interface Props {
+  post: Post;
+  prev?: Post;
+  next?: Post;
+}
+
+const { post, prev, next } = Astro.props;
+const { title, date, place, draft } = post.entry.data;
+const html = await embedFlickrPhotos(post.entry.rendered?.html ?? '');
+const cover = post.coverId ? await getPhoto(post.coverId) : undefined;
+const globeLink = withBase(`/?post=${encodeURIComponent(post.url)}`);
+---
+
+<Base title={title} description={`${place} · ${formatDate(date)}`} image={cover?.thumb.src}>
+  <nav class="top">
+    <a href={globeLink} class="back">← Kaart</a>
+  </nav>
+  <article>
+    <header>
+      <p class="meta">
+        <span class="dot" aria-hidden="true"></span>{place} · <time datetime={date.toISOString().slice(0, 10)}>{formatDate(date)}</time>
+        {draft && <strong> · concept</strong>}
+      </p>
+      <h1>{title}</h1>
+    </header>
+    <div class="body" set:html={html} />
+  </article>
+  <nav class="pager">
+    {prev ? <a href={prev.url}>← {prev.entry.data.place}</a> : <span />}
+    {next && <a href={next.url}>{next.entry.data.place} →</a>}
+  </nav>
+</Base>
+
+<script>
+  import PhotoSwipeLightbox from 'photoswipe/lightbox';
+
+  const lightbox = new PhotoSwipeLightbox({
+    gallery: '.body',
+    children: 'figure.photo > a',
+    pswpModule: () => import('photoswipe'),
+  });
+  lightbox.on('uiRegister', () => {
+    lightbox.pswp?.ui?.registerElement({
+      name: 'flickr-link',
+      order: 8,
+      isButton: false,
+      tagName: 'a',
+      html: 'Flickr ↗',
+      onInit: (el, pswp) => {
+        el.setAttribute('target', '_blank');
+        el.setAttribute('rel', 'noopener');
+        pswp.on('change', () => {
+          const page = pswp.currSlide?.data.element?.dataset.flickrPage;
+          if (page) el.setAttribute('href', page);
+        });
+      },
+    });
+  });
+  lightbox.init();
+</script>
+
+<style>
+  .top,
+  article,
+  .pager {
+    max-width: 42rem;
+    margin: 0 auto;
+    padding: 0 1.25rem;
+  }
+
+  .top {
+    padding-top: 1.25rem;
+  }
+
+  .back {
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  header {
+    margin: 2.5rem 0 2rem;
+  }
+
+  .meta {
+    color: var(--muted);
+    font-size: 0.9rem;
+    margin: 0 0 0.5rem;
+  }
+
+  .dot {
+    display: inline-block;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 50%;
+    background: var(--accent);
+    margin-right: 0.5rem;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 6vw, 3rem);
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+
+  .body {
+    font-size: 1.125rem;
+    line-height: 1.7;
+  }
+
+  .body :global(figure.photo) {
+    margin: 2rem -1.25rem;
+  }
+
+  .body :global(figure.photo img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: var(--line);
+  }
+
+  .body :global(figcaption) {
+    color: var(--muted);
+    font-size: 0.875rem;
+    padding: 0.5rem 1.25rem 0;
+  }
+
+  @media (min-width: 46rem) {
+    .body :global(figure.photo) {
+      margin-inline: 0;
+    }
+
+    .body :global(figcaption) {
+      padding-inline: 0;
+    }
+  }
+
+  .pager {
+    display: flex;
+    justify-content: space-between;
+    border-top: 1px solid var(--line);
+    margin-top: 3rem;
+    padding-block: 1.5rem 3rem;
+  }
+
+  .pager a {
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  :global(.pswp__flickr-link) {
+    color: #fff;
+    align-self: center;
+    font-size: 0.875rem;
+    padding: 0 1rem;
+    text-decoration: none;
+  }
+</style>

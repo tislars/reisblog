@@ -1,0 +1,41 @@
+---
+import '../styles/global.css';
+import { GOATCOUNTER_CODE, SITE_DESCRIPTION, SITE_TITLE } from '../config';
+import { withBase } from '../lib/posts';
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  theme?: 'dark' | 'light';
+}
+
+const { title, description = SITE_DESCRIPTION, image, theme = 'light' } = Astro.props;
+const fullTitle = title ? `${title} · ${SITE_TITLE}` : SITE_TITLE;
+---
+
+<!doctype html>
+<html lang="nl" data-theme={theme}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <link rel="icon" type="image/svg+xml" href={withBase('favicon.svg')} />
+    <link rel="alternate" type="application/rss+xml" title={SITE_TITLE} href={withBase('rss.xml')} />
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <meta property="og:type" content={title ? 'article' : 'website'} />
+    <meta property="og:title" content={title ?? SITE_TITLE} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={Astro.url.href} />
+    {image && <meta property="og:image" content={image} />}
+    <meta name="twitter:card" content={image ? 'summary_large_image' : 'summary'} />
+    {
+      GOATCOUNTER_CODE && (
+        <script is:inline async data-goatcounter={`https://${GOATCOUNTER_CODE}.goatcounter.com/count`} src="https://gc.zgo.at/count.js" />
+      )
+    }
+  </head>
+  <body>
+    <slot />
+  </body>
+</html>
