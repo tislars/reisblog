@@ -24,7 +24,7 @@ const html = await embedFlickrPhotos(post.entry.rendered?.html ?? '');
 const cover = post.coverId ? await getPhoto(post.coverId) : undefined;
 const nextCover = next?.coverId ? await getPhoto(next.coverId) : undefined;
 const globeLink = withBase(`/?post=${encodeURIComponent(post.url)}`);
-const coverTransition = (p: Post) => `view-transition-name: cover-${p.slug.replace(/[^a-z0-9-]/gi, '-')}`;
+const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.replace(/[^a-z0-9-]/gi, '-')}`;
 ---
 
 <Base title={title} description={`Dag ${post.day} in ${place}, ${formatDate(date)}`} image={cover?.thumb.src}>
