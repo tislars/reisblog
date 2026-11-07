@@ -27,9 +27,9 @@ interface View {
 }
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
-const SEA = '#0e1a24';
-const LAND = '#2a3328';
-const BUILDING = '#232b21';
+const SEA = '#24435a';
+const LAND = '#55664d';
+const BUILDING = '#4a5943';
 const STROKE = '#eef0eb';
 const LABEL_MIN_ZOOM = 4;
 const MIN_ZOOM = 1;
