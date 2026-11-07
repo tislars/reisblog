@@ -101,6 +101,7 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
       { threshold: 0.1 },
     );
     document.querySelectorAll('.body figure.photo').forEach((photo) => {
+      if (photo.getBoundingClientRect().top < innerHeight) return;
       photo.classList.add('reveal');
       reveal.observe(photo);
     });
@@ -360,9 +361,14 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
     opacity: 0.88;
   }
 
-  .next:hover .next-title {
-    text-decoration: underline;
+  .next-title {
+    text-decoration: underline transparent;
     text-decoration-thickness: 1px;
+    transition: text-decoration-color 150ms ease;
+  }
+
+  .next:hover .next-title {
+    text-decoration-color: currentColor;
   }
 
   :global(.pswp__flickr-link) {

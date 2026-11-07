@@ -224,6 +224,12 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     border: 2px solid var(--steen);
     cursor: pointer;
     padding: 0;
+    transition: scale 150ms ease;
+  }
+
+  :global(.pulse:hover),
+  :global(.pulse:focus-visible) {
+    scale: 1.25;
   }
 
   :global(.pulse::after) {
