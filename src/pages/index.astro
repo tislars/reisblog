@@ -86,6 +86,7 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     border: 1px solid var(--line);
     border-radius: 0.25rem;
     box-shadow: 0 1.5rem 4rem rgb(14 26 36 / 0.6);
+    animation: rise 200ms ease-out;
   }
 
   .timeline {
@@ -157,6 +158,14 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     background: var(--line);
     outline: 2px solid transparent;
     outline-offset: 2px;
+    transition:
+      outline-color 150ms ease,
+      translate 150ms ease;
+  }
+
+  .timeline li a:hover img,
+  .timeline li a:hover .no-photo {
+    translate: 0 -2px;
   }
 
   .timeline li a:hover img,

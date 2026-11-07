@@ -88,6 +88,23 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.slug.repla
     });
   });
   lightbox.init();
+
+  if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const reveal = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          entry.target.classList.add('shown');
+          reveal.unobserve(entry.target);
+        }
+      },
+      { threshold: 0.1 },
+    );
+    document.querySelectorAll('.body figure.photo').forEach((photo) => {
+      photo.classList.add('reveal');
+      reveal.observe(photo);
+    });
+  }
 </script>
 
 <style>
@@ -162,6 +179,28 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.slug.repla
     outline: 2px solid var(--nachtzee);
     outline-offset: 2px;
     box-shadow: 0 0 0 2px var(--steen);
+  }
+
+  .hero-text,
+  .body > :global(:nth-child(-n + 2)) {
+    animation: rise 300ms ease-out both;
+  }
+
+  .body > :global(:nth-child(-n + 2)) {
+    animation-delay: 100ms;
+  }
+
+  .body :global(figure.photo.reveal) {
+    opacity: 0;
+    translate: 0 1rem;
+    transition:
+      opacity 250ms ease-out,
+      translate 250ms ease-out;
+  }
+
+  .body :global(figure.photo.reveal.shown) {
+    opacity: 1;
+    translate: none;
   }
 
   .hero-text {
@@ -299,6 +338,7 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.slug.repla
   }
 
   .next img {
+    transition: opacity 150ms ease;
     width: 100%;
     aspect-ratio: 3 / 2;
     object-fit: cover;
@@ -314,6 +354,10 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.slug.repla
     font-size: clamp(1.75rem, 5vw, 2.5rem);
     line-height: 1.05;
     letter-spacing: -0.02em;
+  }
+
+  .next:hover img {
+    opacity: 0.88;
   }
 
   .next:hover .next-title {

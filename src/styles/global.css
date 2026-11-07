@@ -57,6 +57,9 @@ body {
 }
 
 a {
+  transition:
+    color 150ms ease,
+    text-decoration-color 150ms ease;
   color: var(--link);
   text-underline-offset: 0.2em;
   text-decoration-thickness: 1px;
@@ -74,4 +77,21 @@ a {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    translate: 0 0.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
