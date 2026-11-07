@@ -261,5 +261,6 @@ export function initGlobe() {
       new Marker({ element: el }).setLngLat(lngLat(latest)).addTo(map);
     }
     if (!saved) map.flyTo({ center: lngLat(focus), zoom: ARRIVAL_ZOOM, duration: 3000 });
+    else if ('url' in focus && focus.url === requested) map.flyTo({ center: lngLat(focus), zoom: Math.max(map.getZoom(), POST_ZOOM), duration: 1500 });
   });
 }

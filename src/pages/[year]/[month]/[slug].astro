@@ -24,11 +24,12 @@ const html = await embedFlickrPhotos(post.entry.rendered?.html ?? '');
 const cover = post.coverId ? await getPhoto(post.coverId) : undefined;
 const nextCover = next?.coverId ? await getPhoto(next.coverId) : undefined;
 const globeLink = withBase(`/?post=${encodeURIComponent(post.url)}`);
+const coverTransition = (p: Post) => `view-transition-name: cover-${p.slug.replace(/[^a-z0-9-]/gi, '-')}`;
 ---
 
 <Base title={title} description={`Dag ${post.day} in ${place}, ${formatDate(date)}`} image={cover?.thumb.src}>
   <header class:list={['hero', { 'has-cover': cover }]}>
-    {cover && <img src={cover.large.src} width={cover.large.width} height={cover.large.height} alt={cover.alt} fetchpriority="high" />}
+    {cover && <img src={cover.large.src} width={cover.large.width} height={cover.large.height} alt={cover.alt} fetchpriority="high" style={coverTransition(post)} />}
     <nav class="top">
       <a href={globeLink} class="back">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -51,7 +52,7 @@ const globeLink = withBase(`/?post=${encodeURIComponent(post.url)}`);
     {
       next && (
         <a href={next.url} class="next">
-          {nextCover && <img src={nextCover.thumb.src} alt="" loading="lazy" decoding="async" />}
+          {nextCover && <img src={nextCover.thumb.src} alt="" loading="lazy" decoding="async" style={coverTransition(next)} />}
           <span class="next-label">Volgende: dag {next.day} in {next.entry.data.place}</span>
           <span class="next-title">{next.entry.data.title}</span>
         </a>
