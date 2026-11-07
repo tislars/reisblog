@@ -88,6 +88,7 @@
       let album = '';
       let page = 0;
       let pages = 0;
+      let request = 0;
 
       const status = el('p', { className: 'status', role: 'status' });
       const albumSelect = el('select', { ariaLabel: 'Album' }, el('option', { value: '', textContent: "Alle foto's" }));
@@ -166,10 +167,12 @@
       };
 
       const loadMore = async () => {
+        const current = request;
         more.disabled = true;
         setStatus("Foto's laden…");
         try {
           const result = await loadPage(album, page + 1);
+          if (current !== request) return;
           page += 1;
           pages = result.pages;
           grid.append(
@@ -193,6 +196,7 @@
       };
 
       const reload = async () => {
+        request += 1;
         grid.replaceChildren();
         page = 0;
         pages = 0;
@@ -257,26 +261,6 @@
   if (!window.CMS) return;
   const h = CMS.React.createElement;
 
-  // Insert-only: inserted URLs end up as plain photo lines, which the build renders as a photo or a photo row.
-  CMS.registerEditorComponent({
-    id: 'flickr-photo',
-    type: 'inline',
-    label: 'Foto uit Flickr',
-    icon: 'add_photo_alternate',
-    pattern: new RegExp(FLICKR_URL),
-    fromInline: (match) => ({ url: match[0] }),
-    toInline: ({ url }) => url ?? '',
-    toPreview: ({ url }) => `📷 Flickr-foto ${url?.match(/\/photos\/[^/]+\/(\d+)/)?.[1] ?? ''}`,
-    onInsert: async () => {
-      const urls = await pickPhotos({ max: MAX_PER_ROW });
-      return urls?.length ? { url: urls.join('\n') } : null;
-    },
-    onEdit: async () => {
-      const urls = await pickPhotos({ max: 1 });
-      return urls?.length ? { url: urls[0] } : null;
-    },
-  });
-
   CMS.registerFieldType('flickr', ({ value, onChange, forID, classNameWrapper }) =>
     h(
       'div',
@@ -302,4 +286,27 @@
       ),
     ),
   );
+
+  // Insert-only: inserted URLs end up as plain photo lines, which the build renders as a photo or a photo row.
+  CMS.registerEditorComponent({
+    id: 'flickr-photo',
+    type: 'inline',
+    label: 'Foto uit Flickr',
+    icon: 'add_photo_alternate',
+    pattern: new RegExp(FLICKR_URL),
+    fromInline: (match) => ({ url: match[0] }),
+    toInline: ({ url }) => url ?? '',
+    toPreview: ({ url }) => {
+      const count = url?.split('\n').filter(Boolean).length ?? 0;
+      return count > 1 ? `📷 ${count} Flickr-foto's naast elkaar` : `📷 Flickr-foto ${url?.match(/\/photos\/[^/]+\/(\d+)/)?.[1] ?? ''}`;
+    },
+    onInsert: async () => {
+      const urls = await pickPhotos({ max: MAX_PER_ROW });
+      return urls?.length ? { url: urls.join('\n') } : null;
+    },
+    onEdit: async () => {
+      const urls = await pickPhotos({ max: MAX_PER_ROW });
+      return urls?.length ? { url: urls.join('\n') } : null;
+    },
+  });
 })();
