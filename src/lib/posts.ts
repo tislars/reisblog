@@ -1,6 +1,7 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
 import { coordsFor, type Coords } from './geocode';
 import { parseFlickrRef, photoIdsInHtml } from './flickr';
+import { dayOfTrip } from './trip';
 
 export type PostEntry = CollectionEntry<'posts'>;
 
@@ -10,6 +11,7 @@ export interface Post extends Coords {
   year: string;
   month: string;
   url: string;
+  day: number;
   coverId?: string;
 }
 
@@ -18,7 +20,7 @@ export const withBase = (path: string) => `${import.meta.env.BASE_URL.replace(/\
 export const formatDate = (date: Date) =>
   date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
 
-async function toPost(entry: PostEntry): Promise<Post> {
+async function toPost(entry: PostEntry, start: Date): Promise<Post> {
   const { date, cover } = entry.data;
   const year = String(date.getUTCFullYear());
   const month = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -29,6 +31,7 @@ async function toPost(entry: PostEntry): Promise<Post> {
     year,
     month,
     url: withBase(`${year}/${month}/${slug}/`),
+    day: dayOfTrip(date, start),
     coverId: (cover && parseFlickrRef(cover)) || photoIdsInHtml(entry.rendered?.html ?? '')[0],
     ...(await coordsFor(entry.data)),
   };
@@ -38,5 +41,5 @@ async function toPost(entry: PostEntry): Promise<Post> {
 export async function getPosts(): Promise<Post[]> {
   const entries = await getCollection('posts', ({ data }) => import.meta.env.DEV || !data.draft);
   entries.sort((a, b) => a.data.date.getTime() - b.data.date.getTime());
-  return Promise.all(entries.map(toPost));
+  return Promise.all(entries.map((entry) => toPost(entry, entries[0].data.date)));
 }

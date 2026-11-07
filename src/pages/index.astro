@@ -3,7 +3,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 import Base from '../layouts/Base.astro';
 import { ACCENT, HOME, SITE_TITLE, SUBSCRIBE_URL } from '../config';
 import { getPhoto } from '../lib/flickr';
-import { formatDate, getPosts, withBase } from '../lib/posts';
+import { formatDate, getPosts } from '../lib/posts';
 
 const posts = await getPosts();
 const markers = await Promise.all(
@@ -12,6 +12,7 @@ const markers = await Promise.all(
     title: post.entry.data.title,
     place: post.entry.data.place,
     date: formatDate(post.entry.data.date),
+    day: post.day,
     lat: post.lat,
     lng: post.lng,
     thumb: post.coverId ? (await getPhoto(post.coverId)).thumb.src : undefined,
@@ -30,7 +31,6 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     <header>
       <span class="title">{SITE_TITLE}</span>
       <span class="links">
-        <a href={withBase('rss.xml')}>RSS</a>
         {SUBSCRIBE_URL && <a href={SUBSCRIBE_URL}>Volgen per mail</a>}
       </span>
     </header>
@@ -39,12 +39,13 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
         <p class="empty">Nog geen posts. Binnenkort meer.</p>
       ) : (
         <ol>
-          {[...markers].reverse().map((m) => (
+          {markers.map((m) => (
             <li>
               <a href={m.url} data-fly={m.url}>
+                {m.thumb ? <img src={m.thumb} alt="" loading="lazy" decoding="async" /> : <span class="no-photo" />}
+                <span class="day">Dag {m.day}</span>
                 <span class="place">{m.place}</span>
                 <span class="post-title">{m.title}</span>
-                <span class="date">{m.date}</span>
               </a>
             </li>
           ))}
@@ -59,12 +60,17 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
 <script>
   import { initGlobe } from '../scripts/globe';
   initGlobe();
+
+  // Oldest post first: start scrolled to the end so the latest day is in view.
+  const timeline = document.querySelector('.timeline ol');
+  if (timeline) timeline.scrollLeft = timeline.scrollWidth;
 </script>
 
 <style>
   #globe {
     position: fixed;
     inset: 0;
+    background: var(--nachtzee);
   }
 
   .card {
@@ -78,8 +84,8 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     overflow: auto;
     background: var(--bg);
     border: 1px solid var(--line);
-    border-radius: 0.75rem;
-    box-shadow: 0 1rem 3rem rgb(0 0 0 / 0.5);
+    border-radius: 0.25rem;
+    box-shadow: 0 1.5rem 4rem rgb(14 26 36 / 0.6);
   }
 
   .timeline {
@@ -89,7 +95,7 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     right: 0;
     bottom: 0;
     padding: 0.75rem 0 max(0.75rem, env(safe-area-inset-bottom));
-    background: linear-gradient(transparent, rgb(11 11 13 / 0.92) 30%);
+    background: linear-gradient(transparent, rgb(14 26 36 / 0.94) 35%);
     pointer-events: none;
   }
 
@@ -105,19 +111,21 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
   }
 
   .title {
-    font-weight: 700;
+    font-size: 1.5rem;
+    font-style: italic;
+    font-weight: 500;
     letter-spacing: -0.01em;
   }
 
   .links a {
-    font-size: 0.85rem;
+    font-size: 0.95rem;
     margin-left: 1rem;
     text-decoration: none;
   }
 
   .timeline ol {
     display: flex;
-    gap: 0.5rem;
+    gap: 1rem;
     margin: 0;
     padding: 0 1rem;
     list-style: none;
@@ -133,40 +141,65 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
 
   .timeline li a {
     display: grid;
-    width: 11rem;
-    padding: 0.6rem 0.75rem;
-    border: 1px solid var(--line);
-    border-radius: 0.5rem;
-    background: var(--bg);
+    width: 10rem;
     color: var(--fg);
     text-decoration: none;
   }
 
-  .timeline li a:hover,
-  .timeline li a[aria-current='true'] {
-    border-color: var(--accent);
+  .timeline img,
+  .no-photo {
+    display: block;
+    width: 100%;
+    aspect-ratio: 3 / 2;
+    object-fit: cover;
+    margin-bottom: 0.5rem;
+    border-radius: 0.125rem;
+    background: var(--line);
+    outline: 2px solid transparent;
+    outline-offset: 2px;
   }
 
-  .place,
+  .timeline li a:hover img,
+  .timeline li a[aria-current='true'] img,
+  .timeline li a:hover .no-photo,
+  .timeline li a[aria-current='true'] .no-photo {
+    outline-color: var(--accent);
+  }
+
+  .day {
+    color: var(--accent);
+    font-size: 0.85rem;
+  }
+
+  .place {
+    font-size: 1.25rem;
+    font-style: italic;
+    line-height: 1.15;
+  }
+
   :global(.card .place) {
     color: var(--accent);
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-size: 1rem;
+    font-style: italic;
   }
 
   .post-title {
-    font-weight: 600;
+    color: var(--muted);
+    font-size: 0.9rem;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  .date,
+  :global(.card .date),
   .empty {
     color: var(--muted);
-    font-size: 0.8rem;
+    font-size: 0.9rem;
+  }
+
+  :global(.card .date) {
+    display: block;
+    margin: -0.5rem 0 0.9rem;
   }
 
   .empty {
@@ -179,7 +212,7 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     height: 18px;
     border-radius: 50%;
     background: var(--accent);
-    border: 2px solid #fff;
+    border: 2px solid var(--steen);
     cursor: pointer;
     padding: 0;
   }
@@ -211,7 +244,7 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     width: 100%;
     aspect-ratio: 3 / 2;
     object-fit: cover;
-    border-radius: 0.75rem 0.75rem 0 0;
+    border-radius: 0.25rem 0.25rem 0 0;
   }
 
   :global(.card .content) {
@@ -219,7 +252,9 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
   }
 
   :global(.card h2) {
-    font-size: 1.15rem;
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1.15;
     margin: 0.2rem 0 0.75rem;
   }
 
@@ -242,7 +277,6 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
 
   :global(.card .read) {
     font-weight: 600;
-    text-decoration: none;
   }
 
   :global(.card .close) {

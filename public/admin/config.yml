@@ -3,8 +3,8 @@ backend:
   repo: tislars/reisblog
   branch: main
 
-site_url: https://tislars.github.io/reisblog
-display_url: https://tislars.github.io/reisblog
+site_url: https://tislars.github.io
+display_url: https://tislars.github.io
 media_folder: public/uploads
 
 collections:
@@ -37,4 +37,4 @@ collections:
       - label: Tekst
         name: body
         widget: markdown
-        hint: 'Foto toevoegen: plak de Flickr-foto-URL (flickr.com/photos/…/1234567890) op een eigen regel. Maximaal 30 per post.'
+        hint: "Foto toevoegen: plak de Flickr-foto-URL (flickr.com/photos/…/1234567890) op een eigen regel. 2 of 3 foto's naast elkaar: gebruik de knop 'Foto's naast elkaar'. Maximaal 30 foto's per post."

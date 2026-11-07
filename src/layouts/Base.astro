@@ -21,6 +21,9 @@ const fullTitle = title ? `${title} · ${SITE_TITLE}` : SITE_TITLE;
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href={withBase('favicon.svg')} />
     <link rel="alternate" type="application/rss+xml" title={SITE_TITLE} href={withBase('rss.xml')} />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300..700;1,6..72,300..700&display=swap" />
     <title>{fullTitle}</title>
     <meta name="description" content={description} />
     <meta property="og:type" content={title ? 'article' : 'website'} />

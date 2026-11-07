@@ -31,6 +31,10 @@ describe('photoIdsInHtml', () => {
     ].join('\n');
     expect(photoIdsInHtml(html)).toEqual(['2', '3']);
   });
+
+  it('finds every ref in a row paragraph, including ones split by <br>', () => {
+    expect(photoIdsInHtml('<p>flickr:4<br>\nflickr:5\nflickr:6</p>')).toEqual(['4', '5', '6']);
+  });
 });
 
 describe('pickSizes', () => {
@@ -63,6 +67,21 @@ describe('embedFlickrPhotos', () => {
     expect(html).toContain('data-flickr-page="https://www.flickr.com/photos/me/7/"');
     expect(html).toContain('<figcaption>A &quot;nice&quot; &lt;b&gt;</figcaption>');
     expect(html).not.toContain('flickr:7');
+  });
+
+  it('puts refs on consecutive lines side by side in a row', async () => {
+    const html = await embedFlickrPhotos(
+      '<p><a href="https://www.flickr.com/photos/me/1/">https://www.flickr.com/photos/me/1/</a>\nflickr:2</p>',
+      async (id) => photo(id),
+    );
+    expect(html.match(/<div class="photo-row">/g)).toHaveLength(1);
+    expect(html.match(/<figure class="photo" style="flex: 1.501">/g)).toHaveLength(2);
+    expect(html).not.toContain('<p>');
+  });
+
+  it('leaves four refs in one paragraph untouched', async () => {
+    const html = '<p>flickr:1\nflickr:2\nflickr:3\nflickr:4</p>';
+    expect(await embedFlickrPhotos(html, async (id) => photo(id))).toBe(html);
   });
 
   it('refuses more than 30 photos per page', async () => {
