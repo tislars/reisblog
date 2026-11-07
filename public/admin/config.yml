@@ -37,4 +37,14 @@ collections:
       - label: Tekst
         name: body
         widget: markdown
-        hint: "Foto toevoegen: plak de Flickr-foto-URL (flickr.com/photos/…/1234567890) op een eigen regel. 2 of 3 foto's naast elkaar: gebruik de knop 'Foto's naast elkaar'. Maximaal 30 foto's per post."
+        default: |
+          Korte intro: waar ben je en hoe kwam je hier?
+
+          ## Wat we deden
+
+          ## Wat opviel
+
+          ## Tips
+
+          - 
+        hint: "Schrijfvragen: wat at je, wat verraste je, wie ontmoette je, wat zou je een ander aanraden? Koppen mag je vrij aanpassen of weghalen. Foto toevoegen: plak de Flickr-foto-URL (flickr.com/photos/…/1234567890) op een eigen regel. 2 of 3 foto's naast elkaar: gebruik de knop 'Foto's naast elkaar'. Maximaal 30 foto's per post."
