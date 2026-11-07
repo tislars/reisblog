@@ -8,7 +8,7 @@ cover: https://www.flickr.com/photos/bohemiannie/16286625671/
 draft: false
 ---
 
-De vlucht van Medellín naar Cartagena duurt een uur, maar het voelt als een ander land. Toen de deuren van het vliegtuig opengingen, stapten we in een warme, vochtige deken van dertig graden. Na een week in truien en regenjassen in de bergen was het even wennen. De lucht ruikt naar zout en uitlaatgassen, en vanaf de luchthaven zie je de zee al tussen de gebouwen door.
+De vlucht van Medellín naar Cartagena duurt een uur, maar het voelt als een ander land. Toen de deuren van het vliegtuig opengingen, stapten we in een warme, vochtige deken van dertig graden. Na een week in de koele bergen was het even wennen. De lucht ruikt naar zout en uitlaatgassen, en vanaf de luchthaven zie je de zee al tussen de gebouwen door.
 
 ## Binnen de muren
 
@@ -33,7 +33,7 @@ We zaten er twee avonden achter elkaar op dezelfde stoep met een koud blikje bie
 
 ## Het fort
 
-Op de laatste ochtend liepen we naar het Castillo San Felipe de Barajas, het grootste fort dat de Spanjaarden in Amerika bouwden. Je kunt door de tunnels lopen die onder het fort door gaan, en die zijn zo gebouwd dat elk geluid ver doordringt. Zo konden de soldaten vijanden horen aankomen. Het is er donker, smal en verrassend koel.
+Op de laatste ochtend liepen we naar het Castillo San Felipe de Barajas, het grootste fort dat de Spanjaarden in Amerika bouwden. Je kunt door de tunnels lopen die onder het fort door gaan, en die zijn naar verluidt zo gebouwd dat elk geluid ver doordringt. Zo konden de soldaten vijanden horen aankomen. Het is er donker, smal en verrassend koel.
 
 https://www.flickr.com/photos/41111966@N04/34801709211/
 
