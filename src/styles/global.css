@@ -1,28 +1,17 @@
 :root {
-  --nachtzee: #0e1a24;
-  --steen: #eef0eb;
-  --inkt: #1c2620;
-  --mos: #6f7f5c;
-  --oker: #e8b23a;
-  --oker-donker: #7e5709;
+  /* Veldnotities: paper, ink and one accent. Mirrored for the map in src/lib/mapstyle.ts. */
+  --paper: #f3eee4;
+  --ink: #1b1f1a;
+  --mute: #6d6a60; /* 4.7:1 on paper */
+  --line: #d8d0bf;
+  --land: #e3dac7;
+  --verm: #e0442b; /* 3.6:1 on paper: only text >= 24px or graphic elements */
+  --verm-tekst: #c2381f; /* 4.7:1 on paper: the accent in small text */
 
-  --accent: var(--oker);
-  --link: var(--oker-donker);
-  --bg: var(--steen);
-  --fg: var(--inkt);
-  --muted: #5a6650;
-  --line: #d5dacd;
   --font: 'Newsreader', Georgia, serif;
+  --display: 'Fraunces', Georgia, serif;
+  --mono: 'IBM Plex Mono', ui-monospace, monospace;
   color-scheme: light;
-}
-
-[data-theme='dark'] {
-  --link: var(--oker);
-  --bg: var(--nachtzee);
-  --fg: var(--steen);
-  --muted: #9aa78c;
-  --line: #24333f;
-  color-scheme: dark;
 }
 
 *,
@@ -49,8 +38,8 @@
 html,
 body {
   margin: 0;
-  background: var(--bg);
-  color: var(--fg);
+  background: var(--paper);
+  color: var(--ink);
   font-family: var(--font);
   font-optical-sizing: auto;
   -webkit-font-smoothing: antialiased;
@@ -60,14 +49,21 @@ a {
   transition:
     color 150ms ease,
     text-decoration-color 150ms ease;
-  color: var(--link);
+  color: inherit;
+  text-decoration-color: var(--verm);
   text-underline-offset: 0.2em;
   text-decoration-thickness: 1px;
 }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--ink);
   outline-offset: 2px;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  letter-spacing: 0.03em;
 }
 
 .sr-only {

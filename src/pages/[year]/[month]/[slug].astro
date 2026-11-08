@@ -152,8 +152,8 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
     max-width: none;
     min-height: min(85svh, 52rem);
     padding-bottom: clamp(2rem, 6vw, 4rem);
-    color: var(--steen);
-    background: var(--nachtzee);
+    color: var(--paper);
+    background: var(--ink);
   }
 
   .hero img {
@@ -168,7 +168,7 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(rgb(14 26 36 / 0.45), transparent 25%, transparent 45%, rgb(14 26 36 / 0.85));
+    background: linear-gradient(rgb(27 31 26 / 0.45), transparent 25%, transparent 45%, rgb(27 31 26 / 0.85));
   }
 
   .top,
@@ -186,12 +186,12 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
     align-items: center;
     gap: 0.25rem;
     padding: 0.6rem 0.9rem 0.6rem 0.7rem;
-    border: 1px solid rgb(238 240 235 / 0.18);
+    border: 1px solid rgb(243 238 228 / 0.18);
     border-radius: 999px;
-    background: rgb(14 26 36 / 0.82);
+    background: rgb(27 31 26 / 0.82);
     backdrop-filter: blur(8px);
-    box-shadow: 0 4px 16px rgb(14 26 36 / 0.25);
-    color: var(--steen);
+    box-shadow: 0 4px 16px rgb(27 31 26 / 0.25);
+    color: var(--paper);
     font-size: 1rem;
     line-height: 1;
     text-decoration: none;
@@ -202,14 +202,14 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
 
   .back:hover,
   .back:focus-visible {
-    background: var(--oker);
-    color: var(--nachtzee);
+    background: var(--paper);
+    color: var(--ink);
   }
 
   .back:focus-visible {
-    outline: 2px solid var(--nachtzee);
+    outline: 2px solid var(--ink);
     outline-offset: 2px;
-    box-shadow: 0 0 0 2px var(--steen);
+    box-shadow: 0 0 0 2px var(--paper);
   }
 
   .hero-text,
@@ -247,13 +247,13 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
 
   .day {
     margin: 0 0 0.5rem;
-    color: var(--link);
+    color: var(--verm-tekst);
     font-size: clamp(1.15rem, 2.5vw, 1.5rem);
     font-style: italic;
   }
 
   .has-cover .day {
-    color: var(--oker);
+    color: inherit;
   }
 
   h1 {
@@ -267,7 +267,7 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
 
   .date {
     margin: 1rem 0 0;
-    color: var(--muted);
+    color: var(--mute);
   }
 
   .has-cover .date {
@@ -305,8 +305,8 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
     margin-top: 0.35rem;
   }
 
-  .body :global(li::marker) {
-    color: var(--accent);
+  .body :global(ul li::marker) {
+    color: var(--verm);
   }
 
   .body :global(figure.photo),
@@ -340,7 +340,7 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
   }
 
   .body :global(figcaption) {
-    color: var(--muted);
+    color: var(--mute);
     font-size: 0.95rem;
     font-style: italic;
     padding: 0.6rem 1.25rem 0;
@@ -376,7 +376,7 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
   .next {
     display: grid;
     gap: 0.25rem;
-    color: var(--fg);
+    color: var(--ink);
     text-decoration: none;
   }
 
@@ -389,7 +389,7 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
   }
 
   .next-label {
-    color: var(--link);
+    color: var(--verm-tekst);
     font-style: italic;
   }
 

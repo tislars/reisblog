@@ -1,8 +1,8 @@
-import { Map as MapLibreMap, Marker, setWorkerUrl, type GeoJSONSource, type LngLatLike, type MapLayerMouseEvent } from 'maplibre-gl';
+import { Map as MapLibreMap, Marker, setWorkerUrl, type FillLayerSpecification, type GeoJSONSource, type LngLatLike, type MapLayerMouseEvent } from 'maplibre-gl';
 // MapLibre looks for its worker next to its own module, which no longer exists once bundled.
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { escapeHtml } from '../lib/html';
-import { minZoomFor } from '../lib/mapstyle';
+import { MAP_COLORS, globeOutlineRadius, graticule, minZoomFor, paintFor } from '../lib/mapstyle';
 import { arrivalZoom, snapZoom, stepZoom, zoomLevels } from '../lib/zoom';
 
 interface GlobePost {
@@ -28,11 +28,9 @@ interface View {
   zoom: number;
 }
 
-const STYLE_URL = 'https://tiles.openfreemap.org/styles/dark';
-const SEA = '#24435a';
-const LAND = '#55664d';
-const BUILDING = '#4a5943';
-const STROKE = '#eef0eb';
+type PaintName = Parameters<MapLibreMap['setPaintProperty']>[1];
+
+const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 const MIN_ZOOM = 1;
 const ARRIVAL_ZOOM = 3;
 const POST_ZOOM = 5;
@@ -62,17 +60,50 @@ function writeView(map: MapLibreMap) {
 }
 
 function restyle(map: MapLibreMap) {
-  map.setPaintProperty('background', 'background-color', LAND);
-  map.setPaintProperty('water', 'fill-color', SEA);
-  map.setPaintProperty('waterway', 'line-color', SEA);
-  map.setPaintProperty('building', 'fill-color', BUILDING);
   for (const layer of map.getStyle().layers) {
-    if (layer.type === 'fill' && /^(landcover|landuse)/.test(layer.id)) {
-      map.setPaintProperty(layer.id, 'fill-color', LAND);
-    }
-    const minzoom = minZoomFor(layer as Parameters<typeof minZoomFor>[0]);
+    const style = layer as Parameters<typeof paintFor>[0];
+    for (const [property, value] of Object.entries(paintFor(style) ?? {})) map.setPaintProperty(layer.id, property as PaintName, value);
+    const minzoom = minZoomFor(style);
     if (minzoom !== undefined) map.setLayerZoomRange(layer.id, minzoom, layer.maxzoom ?? 24);
   }
+
+  // Graticule and coastline in ink above all area fills, below roads and labels. OpenFreeMap has no
+  // coastline layer, so outline the water polygons instead. (The land is the background, so the grid can't stop at the coast.)
+  const layers = map.getStyle().layers;
+  const water = layers.find((l) => l.id === 'water') as FillLayerSpecification | undefined;
+  const lastFill = layers.findLastIndex((l) => l.type === 'fill' && l['source-layer'] !== 'building');
+  const above = layers[lastFill + 1]?.id;
+  map.addSource('graticule', { type: 'geojson', data: graticule() });
+  map.addLayer({ id: 'graticule', type: 'line', source: 'graticule', paint: { 'line-color': MAP_COLORS.line, 'line-width': 0.6 } }, above);
+  map.addLayer(
+    {
+      id: 'coast',
+      type: 'line',
+      source: water?.source ?? 'openmaptiles',
+      'source-layer': 'water',
+      filter: water?.filter,
+      paint: { 'line-color': MAP_COLORS.ink, 'line-width': 0.7 },
+    },
+    above,
+  );
+}
+
+/** The edge of the globe as an ink circle; MapLibre has no layer for it, so it is an element sized to match. */
+function addRim(map: MapLibreMap) {
+  const rim = document.createElement('div');
+  rim.className = 'globe-rim';
+  rim.setAttribute('aria-hidden', 'true');
+  map.getCanvasContainer().after(rim);
+  const update = () => {
+    const { clientWidth: width, clientHeight: height } = map.getContainer();
+    const r = globeOutlineRadius(map.getZoom(), map.getCenter().lat, height);
+    // Once zoomed in past the screen corners the edge is out of view; skip giant elements.
+    rim.hidden = r > Math.hypot(width, height);
+    rim.style.width = rim.style.height = `${2 * r}px`;
+  };
+  map.on('move', update);
+  map.on('resize', update);
+  update();
 }
 
 function addLayers(map: MapLibreMap, { posts, home, accent }: GlobeData) {
@@ -91,13 +122,13 @@ function addLayers(map: MapLibreMap, { posts, home, accent }: GlobeData) {
     },
   });
 
-  map.addLayer({ id: 'route', type: 'line', source: 'route', paint: { 'line-color': accent, 'line-width': 2, 'line-opacity': 0.7, 'line-dasharray': [2, 2] } });
+  map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': accent, 'line-width': 1.6 } });
   map.addLayer({
     id: 'clusters',
     type: 'circle',
     source: 'posts',
     filter: ['has', 'point_count'],
-    paint: { 'circle-color': accent, 'circle-radius': 16, 'circle-stroke-color': STROKE, 'circle-stroke-width': 2 },
+    paint: { 'circle-color': MAP_COLORS.paper, 'circle-radius': 13, 'circle-stroke-color': accent, 'circle-stroke-width': 1.6 },
   });
   map.addLayer({
     id: 'cluster-count',
@@ -105,14 +136,14 @@ function addLayers(map: MapLibreMap, { posts, home, accent }: GlobeData) {
     source: 'posts',
     filter: ['has', 'point_count'],
     layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Regular'], 'text-size': 13 },
-    paint: { 'text-color': SEA },
+    paint: { 'text-color': MAP_COLORS.ink },
   });
   map.addLayer({
     id: 'points',
     type: 'circle',
     source: 'posts',
     filter: ['!', ['has', 'point_count']],
-    paint: { 'circle-color': accent, 'circle-radius': 7, 'circle-stroke-color': STROKE, 'circle-stroke-width': 2 },
+    paint: { 'circle-color': MAP_COLORS.paper, 'circle-radius': 6, 'circle-stroke-color': accent, 'circle-stroke-width': 1.6 },
   });
   // Invisible, finger-sized hit area so small markers are tappable on phones.
   map.addLayer({
@@ -236,6 +267,7 @@ export function initGlobe() {
     zoom: saved?.zoom ?? MIN_ZOOM,
     minZoom: MIN_ZOOM,
     maxZoom: MAX_ZOOM,
+    maxPitch: 0, // the rim assumes a straight-down view
     scrollZoom: false,
     doubleClickZoom: false,
     attributionControl: { compact: true },
@@ -254,13 +286,15 @@ export function initGlobe() {
     attrib?.classList.remove('maplibregl-compact-show');
     attrib?.removeAttribute('open');
     addLayers(map, data);
+    addRim(map);
     bindEvents(map, data, preview);
     const latest = data.posts.at(-1);
     if (latest) {
       const el = document.createElement('button');
       el.className = 'pulse';
       el.type = 'button';
-      el.setAttribute('aria-label', `Nu: ${latest.place}`);
+      el.textContent = String(latest.day);
+      el.setAttribute('aria-label', `Nu: dag ${latest.day} in ${latest.place}`);
       el.addEventListener('click', () => preview.show([latest]));
       new Marker({ element: el }).setLngLat(lngLat(latest)).addTo(map);
     }
