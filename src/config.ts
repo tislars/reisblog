@@ -1,5 +1,7 @@
 export const SITE_TITLE = 'Reisblog';
 export const SITE_DESCRIPTION = 'Vier maanden onderweg, post voor post op de kaart.';
+// The part of SITE_DESCRIPTION set in italic vermilion in the homepage headline.
+export const SITE_DESCRIPTION_ACCENT = 'post voor post';
 export const ACCENT = '#e0442b';
 export const HOME = { name: 'Nederland', lat: 52.37, lng: 4.9 };
 export const REPO_URL = 'https://github.com/tislars/reisblog';

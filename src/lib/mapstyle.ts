@@ -49,6 +49,9 @@ export function paintFor(layer: StyleLayer): Record<string, string | number> | u
 
 type Position = [lng: number, lat: number];
 
+// Where Web Mercator tiles end.
+const MAX_LATITUDE = 85.051129;
+
 /** Meridians and parallels every `step` degrees, as one GeoJSON MultiLineString feature. */
 export function graticule(step = GRATICULE_STEP) {
   const lines: Position[][] = [];
@@ -59,10 +62,22 @@ export function graticule(step = GRATICULE_STEP) {
   return { type: 'Feature' as const, properties: {}, geometry: { type: 'MultiLineString' as const, coordinates: lines } };
 }
 
+/**
+ * A band around the North Pole, up to the edge of the Mercator tiles. Outlining the water polygons draws that
+ * edge as a ring at 85°N; covering it in paper hides the ring (it is all sea up there).
+ */
+export function northCap(from = 84) {
+  const edge = MAX_LATITUDE + 0.01;
+  const ring: Position[] = [];
+  for (let lng = -180; lng <= 180; lng += 1) ring.push([lng, from]);
+  for (let lng = 180; lng >= -180; lng -= 1) ring.push([lng, edge]);
+  ring.push(ring[0]);
+  return { type: 'Feature' as const, properties: {}, geometry: { type: 'Polygon' as const, coordinates: [ring] } };
+}
+
 /** MapLibre's default vertical field of view (36.87°). */
 const FOV = 0.6435011087932844;
 const TILE_SIZE = 512;
-const MAX_LATITUDE = 85.051129;
 
 /**
  * Radius in CSS pixels of the globe's outline on screen, for an unpitched globe projection:
@@ -73,4 +88,15 @@ export function globeOutlineRadius(zoom: number, latitude: number, height: numbe
   const radius = (TILE_SIZE * 2 ** zoom) / (2 * Math.PI) / scale;
   const focal = 0.5 / Math.tan(FOV / 2) * height;
   return (focal * radius) / Math.sqrt(focal * focal + 2 * focal * radius);
+}
+
+/** The zoom at which the globe's outline has `radius` CSS pixels: the inverse of globeOutlineRadius. */
+export function zoomForGlobeRadius(radius: number, latitude: number, height: number): number {
+  let [low, high] = [-2, 24];
+  for (let i = 0; i < 40; i++) {
+    const mid = (low + high) / 2;
+    if (globeOutlineRadius(mid, latitude, height) < radius) low = mid;
+    else high = mid;
+  }
+  return (low + high) / 2;
 }

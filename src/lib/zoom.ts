@@ -17,12 +17,3 @@ export function snapZoom(levels: number[], from: number, to: number): number {
   if (exact !== undefined) return exact;
   return to > from ? stepZoom(levels, to, 1) : stepZoom(levels, to, -1);
 }
-
-// Viewport edge (px) at which the base arrival zoom shows the whole globe comfortably.
-const REFERENCE_EDGE = 1000;
-
-/** Zoom to arrive at: `base` on large screens, less on small ones so the globe still fits. */
-export function arrivalZoom(base: number, min: number, width: number, height: number): number {
-  const fit = base + Math.log2(Math.min(width, height) / REFERENCE_EDGE);
-  return Math.min(base, Math.max(min, fit));
-}

@@ -1,14 +1,16 @@
 import { Map as MapLibreMap, Marker, setWorkerUrl, type FillLayerSpecification, type GeoJSONSource, type LngLatLike, type MapLayerMouseEvent } from 'maplibre-gl';
 // MapLibre looks for its worker next to its own module, which no longer exists once bundled.
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
+import { distanceKm } from '../lib/geo';
 import { escapeHtml } from '../lib/html';
-import { MAP_COLORS, globeOutlineRadius, graticule, minZoomFor, paintFor } from '../lib/mapstyle';
-import { arrivalZoom, snapZoom, stepZoom, zoomLevels } from '../lib/zoom';
+import { MAP_COLORS, globeOutlineRadius, graticule, minZoomFor, northCap, paintFor, zoomForGlobeRadius } from '../lib/mapstyle';
+import { snapZoom, stepZoom, zoomLevels } from '../lib/zoom';
 
 interface GlobePost {
   url: string;
   title: string;
   place: string;
+  placeName: string;
   date: string;
   day: number;
   lat: number;
@@ -32,13 +34,17 @@ type PaintName = Parameters<MapLibreMap['setPaintProperty']>[1];
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 const MIN_ZOOM = 1;
-const ARRIVAL_ZOOM = 3;
+// Share of the map's shorter side the globe's radius takes on arrival, as in the design.
+const GLOBE_FIT = 0.43;
 const POST_ZOOM = 5;
 const MAX_ZOOM = 15;
 const ZOOM_LEVELS = zoomLevels(MIN_ZOOM, MAX_ZOOM, 8);
 const WHEEL_GESTURE_GAP_MS = 200;
 const VIEW_KEY = 'globe-view';
 const MAX_LEAVES = 100;
+// About 70° of arc from the centre of view: beyond this a point sits close to or behind the globe's edge.
+const FAR_SIDE_KM = 7800;
+
 
 const lngLat = (p: { lat: number; lng: number }): LngLatLike => [p.lng, p.lat];
 
@@ -86,6 +92,8 @@ function restyle(map: MapLibreMap) {
     },
     above,
   );
+  map.addSource('north-cap', { type: 'geojson', data: northCap() });
+  map.addLayer({ id: 'north-cap', type: 'fill', source: 'north-cap', paint: { 'fill-color': MAP_COLORS.paper } }, above);
 }
 
 /** The edge of the globe as an ink circle; MapLibre has no layer for it, so it is an element sized to match. */
@@ -145,6 +153,14 @@ function addLayers(map: MapLibreMap, { posts, home, accent }: GlobeData) {
     filter: ['!', ['has', 'point_count']],
     paint: { 'circle-color': MAP_COLORS.paper, 'circle-radius': 6, 'circle-stroke-color': accent, 'circle-stroke-width': 1.6 },
   });
+  // The post under the pointer or keyboard focus in the index; unclustered so it shows at any zoom.
+  map.addSource('focus', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
+  map.addLayer({
+    id: 'focus',
+    type: 'circle',
+    source: 'focus',
+    paint: { 'circle-color': accent, 'circle-radius': 8, 'circle-stroke-color': MAP_COLORS.paper, 'circle-stroke-width': 2 },
+  });
   // Invisible, finger-sized hit area so small markers are tappable on phones.
   map.addLayer({
     id: 'points-hit',
@@ -157,39 +173,72 @@ function addLayers(map: MapLibreMap, { posts, home, accent }: GlobeData) {
 
 function createPreview(posts: GlobePost[]) {
   const card = document.getElementById('preview')!;
-
+  let returnTo: HTMLElement | undefined;
   const hide = () => {
+    if (card.hidden) return;
     card.hidden = true;
-    document.querySelectorAll('[data-fly][aria-current]').forEach((el) => el.removeAttribute('aria-current'));
+    returnTo?.focus();
   };
+  const day = (p: GlobePost) => `Dag ${String(p.day).padStart(2, '0')} · ${escapeHtml(p.placeName)}`;
 
   const show = (items: GlobePost[]) => {
     const close = '<button class="close" type="button" aria-label="Sluiten">×</button>';
     if (items.length === 1) {
       const [p] = items;
-      card.innerHTML = `${p.thumb ? `<img src="${escapeHtml(p.thumb)}"${p.thumbSrcset ? ` srcset="${escapeHtml(p.thumbSrcset)}" sizes="min(22rem, 100vw - 2rem)"` : ''} alt="">` : ''}<div class="content">${close}<span class="place">Dag ${p.day} in ${escapeHtml(p.place)}</span><h2>${escapeHtml(p.title)}</h2><span class="date">${escapeHtml(p.date)}</span><a class="read" href="${escapeHtml(p.url)}">Lees verder</a></div>`;
+      card.innerHTML = `${p.thumb ? `<img src="${escapeHtml(p.thumb)}"${p.thumbSrcset ? ` srcset="${escapeHtml(p.thumbSrcset)}" sizes="20rem"` : ''} alt="">` : ''}<div class="content">${close}<span class="label">${day(p)}</span><h2>${escapeHtml(p.title)}</h2><span class="date">${escapeHtml(p.date)}</span><a class="read" href="${escapeHtml(p.url)}">Lees verder →</a></div>`;
     } else {
-      const list = items
-        .map((p) => `<li><a href="${escapeHtml(p.url)}"><span class="place">Dag ${p.day} in ${escapeHtml(p.place)}</span><br>${escapeHtml(p.title)}</a></li>`)
-        .join('');
+      const list = items.map((p) => `<li><a href="${escapeHtml(p.url)}"><span class="label">${day(p)}</span>${escapeHtml(p.title)}</a></li>`).join('');
       card.innerHTML = `<div class="content">${close}<h2>${items.length} posts</h2><ul>${list}</ul></div>`;
     }
-    card.querySelector('.close')!.addEventListener('click', hide);
+    const closeButton = card.querySelector<HTMLButtonElement>('.close')!;
+    closeButton.addEventListener('click', hide);
     card.hidden = false;
-    const current = items.length === 1 ? items[0].url : undefined;
-    document.querySelectorAll<HTMLElement>('[data-fly]').forEach((el) => {
-      if (el.dataset.fly === current) el.setAttribute('aria-current', 'true');
-      else el.removeAttribute('aria-current');
-    });
+    returnTo = document.activeElement instanceof HTMLElement ? document.activeElement : undefined;
+    closeButton.focus();
   };
 
   document.addEventListener('keydown', (e) => e.key === 'Escape' && hide());
   return { show, hide, byIndex: (i: number) => posts[i] };
 }
 
-function bindEvents(map: MapLibreMap, data: GlobeData, preview: ReturnType<typeof createPreview>) {
-  const flyTo = (p: GlobePost) => map.flyTo({ center: lngLat(p), zoom: Math.max(map.getZoom(), POST_ZOOM) });
+/** Hovering or focusing a row in the index marks its post on the globe. */
+function bindIndex(map: MapLibreMap, data: GlobeData) {
+  const source = map.getSource<GeoJSONSource>('focus')!;
+  let marked: string | undefined;
 
+  // A post on the far side of the globe or off-screen would light up unseen.
+  const inView = (post: GlobePost) => {
+    const { lng, lat } = map.getCenter();
+    if (distanceKm({ lat, lng }, post) > FAR_SIDE_KM) return false;
+    const { x, y } = map.project(lngLat(post));
+    const { clientWidth: width, clientHeight: height } = map.getContainer();
+    return x >= 0 && y >= 0 && x <= width && y <= height;
+  };
+
+  const mark = (url?: string) => {
+    if (url === marked) return;
+    marked = url;
+    const post = data.posts.find((p) => p.url === url);
+    // Turning towards it is not a view the reader chose, so it isn't remembered (see moveend).
+    if (post && !inView(post)) map.easeTo({ center: lngLat(post), duration: 600 }, { fromIndex: true });
+    source.setData({
+      type: 'FeatureCollection',
+      features: post ? [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [post.lng, post.lat] } }] : [],
+    });
+  };
+
+  const row = (el: EventTarget | Element | null) => (el instanceof Element ? el.closest<HTMLElement>('[data-post]') : null);
+  // When the pointer leaves, fall back to the row that has keyboard focus, if any.
+  const focused = () => row(document.activeElement)?.dataset.post;
+  document.querySelectorAll('.idx').forEach((index) => {
+    index.addEventListener('mouseover', (e) => mark(row(e.target)?.dataset.post));
+    index.addEventListener('mouseleave', () => mark(focused()));
+    index.addEventListener('focusin', (e) => mark(row(e.target)?.dataset.post));
+    index.addEventListener('focusout', (e) => mark(row((e as FocusEvent).relatedTarget)?.dataset.post));
+  });
+}
+
+function bindEvents(map: MapLibreMap, preview: ReturnType<typeof createPreview>) {
   map.on('click', 'points-hit', (e: MapLayerMouseEvent) => {
     const post = preview.byIndex(e.features![0].properties.i);
     preview.show([post]);
@@ -206,17 +255,9 @@ function bindEvents(map: MapLibreMap, data: GlobeData, preview: ReturnType<typeo
     map.on('mouseleave', layer, () => (map.getCanvas().style.cursor = ''));
   }
 
-  document.querySelectorAll<HTMLAnchorElement>('[data-fly]').forEach((link) => {
-    link.addEventListener('click', (e) => {
-      const post = data.posts.find((p) => p.url === link.dataset.fly);
-      if (!post) return;
-      e.preventDefault();
-      flyTo(post);
-      preview.show([post]);
-    });
+  map.on('moveend', (e) => {
+    if (!(e as { fromIndex?: boolean }).fromIndex) writeView(map);
   });
-
-  map.on('moveend', () => writeView(map));
 }
 
 function bindZoomSteps(map: MapLibreMap) {
@@ -281,13 +322,15 @@ export function initGlobe() {
   });
 
   map.on('load', () => {
-    // The compact attribution starts expanded and then covers the timeline; start it collapsed (the ⓘ stays).
+    // The compact attribution starts expanded and then covers the legend; start it collapsed (the ⓘ stays).
     const attrib = map.getContainer().querySelector('.maplibregl-ctrl-attrib');
     attrib?.classList.remove('maplibregl-compact-show');
     attrib?.removeAttribute('open');
     addLayers(map, data);
     addRim(map);
-    bindEvents(map, data, preview);
+    map.getContainer().closest('.map')?.classList.add('ready');
+    bindEvents(map, preview);
+    bindIndex(map, data);
     const latest = data.posts.at(-1);
     if (latest) {
       const el = document.createElement('button');
@@ -296,9 +339,10 @@ export function initGlobe() {
       el.textContent = String(latest.day);
       el.setAttribute('aria-label', `Nu: dag ${latest.day} in ${latest.place}`);
       el.addEventListener('click', () => preview.show([latest]));
-      new Marker({ element: el }).setLngLat(lngLat(latest)).addTo(map);
+      new Marker({ element: el, opacityWhenCovered: 0 }).setLngLat(lngLat(latest)).addTo(map);
     }
-    const arrival = arrivalZoom(ARRIVAL_ZOOM, MIN_ZOOM, innerWidth, innerHeight);
+    const { clientWidth: width, clientHeight: height } = map.getContainer();
+    const arrival = Math.max(MIN_ZOOM, zoomForGlobeRadius(GLOBE_FIT * Math.min(width, height), focus.lat, height));
     if (!saved) map.flyTo({ center: lngLat(focus), zoom: arrival, duration: 3000 });
     else if ('url' in focus && focus.url === requested) map.flyTo({ center: lngLat(focus), zoom: Math.max(map.getZoom(), POST_ZOOM), duration: 1500 });
   });

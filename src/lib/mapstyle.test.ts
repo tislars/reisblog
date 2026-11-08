@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAP_COLORS, ROAD_MIN_ZOOM, globeOutlineRadius, graticule, minZoomFor, paintFor } from './mapstyle';
+import { MAP_COLORS, ROAD_MIN_ZOOM, globeOutlineRadius, graticule, minZoomFor, northCap, paintFor, zoomForGlobeRadius } from './mapstyle';
 
 describe('minZoomFor', () => {
   it('hides roads and railways until zoomed in to region level', () => {
@@ -83,5 +83,26 @@ describe('globeOutlineRadius', () => {
 
   it('grows away from the equator, as MapLibre keeps the scale at the centre', () => {
     expect(globeOutlineRadius(1, 60, 800)).toBeGreaterThan(globeOutlineRadius(1, 0, 800) * 1.8);
+  });
+});
+
+describe('zoomForGlobeRadius', () => {
+  it('finds the zoom that gives the globe the wanted size', () => {
+    const zoom = zoomForGlobeRadius(300, 10, 700);
+    expect(globeOutlineRadius(zoom, 10, 700)).toBeCloseTo(300, 3);
+  });
+
+  it('zooms out for a smaller globe', () => {
+    expect(zoomForGlobeRadius(120, 10, 300)).toBeLessThan(zoomForGlobeRadius(300, 10, 700));
+  });
+});
+
+describe('northCap', () => {
+  it('is a closed band from 84°N to just past the edge of the tiles', () => {
+    const [ring] = northCap().geometry.coordinates;
+    expect(ring[0]).toEqual(ring.at(-1));
+    const lats = ring.map(([, lat]) => lat);
+    expect(Math.min(...lats)).toBe(84);
+    expect(Math.max(...lats)).toBeGreaterThan(85.0511);
   });
 });

@@ -17,6 +17,9 @@ export interface Post extends Coords {
 
 export const withBase = (path: string) => `${import.meta.env.BASE_URL.replace(/\/$/, '')}/${path.replace(/^\//, '')}`;
 
+/** The place without the country: `Medellín, Colombia` → `Medellín`. */
+export const placeName = (place: string) => place.split(',')[0].trim();
+
 export const formatDate = (date: Date) =>
   date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
 

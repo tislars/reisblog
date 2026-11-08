@@ -1,9 +1,10 @@
 ---
 import 'maplibre-gl/dist/maplibre-gl.css';
 import Base from '../layouts/Base.astro';
-import { ACCENT, HOME, SITE_DESCRIPTION, SITE_TITLE, SUBSCRIBE_URL } from '../config';
+import { ACCENT, HOME, SITE_DESCRIPTION, SITE_DESCRIPTION_ACCENT, SITE_TITLE, SUBSCRIBE_URL } from '../config';
 import { getPhoto, srcset } from '../lib/flickr';
-import { formatDate, getPosts } from '../lib/posts';
+import { formatKm, formatLat, formatLatLng, routeKm } from '../lib/geo';
+import { formatDate, getPosts, placeName } from '../lib/posts';
 
 const posts = await getPosts();
 const markers = await Promise.all(
@@ -13,53 +14,75 @@ const markers = await Promise.all(
       url: post.url,
       title: post.entry.data.title,
       place: post.entry.data.place,
+      placeName: placeName(post.entry.data.place),
       date: formatDate(post.entry.data.date),
       day: post.day,
       lat: post.lat,
       lng: post.lng,
       thumb: cover?.thumb.src,
-      // Cards are at most 22rem wide; 800px covers them on 2x screens.
+      // Cards are at most 20rem wide; 800px covers them on 2x screens.
       thumbSrcset: cover ? srcset(cover, 800) : undefined,
     };
   }),
 );
 const globeData = { posts: markers, home: HOME, accent: ACCENT };
+const latest = markers.at(-1);
+const km = formatKm(routeKm([HOME, ...posts]));
+const dayLabel = (day: number) => `DAG ${String(day).padStart(2, '0')}`;
+
+// The headline sets the accent phrase of the description in italic vermilion.
+const accentAt = SITE_DESCRIPTION_ACCENT ? SITE_DESCRIPTION.indexOf(SITE_DESCRIPTION_ACCENT) : -1;
+const headline =
+  accentAt < 0
+    ? { before: SITE_DESCRIPTION, accent: '', after: '' }
+    : {
+        before: SITE_DESCRIPTION.slice(0, accentAt),
+        accent: SITE_DESCRIPTION_ACCENT,
+        after: SITE_DESCRIPTION.slice(accentAt + SITE_DESCRIPTION_ACCENT.length),
+      };
 ---
 
 <Base>
-  <div id="globe" role="region" aria-label="Wereldkaart met posts"></div>
-
-  <aside id="preview" class="card" hidden aria-live="polite"></aside>
-
-  <section class="timeline" aria-label="Alle posts">
-    <header>
-      <hgroup>
-        <h1 class="title">{SITE_TITLE}</h1>
-        <p class="tagline">{SITE_DESCRIPTION}</p>
-      </hgroup>
-      <span class="links">
-        {SUBSCRIBE_URL && <a href={SUBSCRIBE_URL}>Volgen per mail</a>}
-      </span>
+  <div class="page">
+    <header class="top mono">
+      <span class="name">{SITE_TITLE.toUpperCase()}</span>
+      {latest && <span class="live">Dag {latest.day} · nu in {latest.placeName}</span>}
+      {latest && <span class="coords">{formatLatLng(latest)}</span>}
     </header>
-    {
-      posts.length === 0 ? (
-        <p class="empty">Nog geen posts. Binnenkort meer.</p>
-      ) : (
-        <ol>
-          {markers.map((m) => (
-            <li>
-              <a href={m.url} data-fly={m.url}>
-                {m.thumb ? <img src={m.thumb} srcset={m.thumbSrcset} sizes="10rem" alt="" loading="lazy" decoding="async" /> : <span class="no-photo" />}
-                <span class="day">Dag {m.day}</span>
-                <span class="place">{m.place}</span>
-                <span class="post-title">{m.title}</span>
-              </a>
-            </li>
-          ))}
-        </ol>
-      )
-    }
-  </section>
+
+    <main class="grid">
+      <section class="intro" aria-labelledby="headline">
+        <h1 id="headline">{headline.before}{headline.accent && <em>{headline.accent}</em>}{headline.after}</h1>
+        {SUBSCRIBE_URL && <a class="subscribe mono" href={SUBSCRIBE_URL}>Volgen per mail</a>}
+        {
+          markers.length === 0 ? (
+            <p class="empty">Nog geen posts. Binnenkort meer.</p>
+          ) : (
+            <nav class="index" aria-label="Alle posts">
+              <ol class="idx">
+                {markers.toReversed().map((m) => (
+                  <li>
+                    <a href={m.url} data-post={m.url} aria-current={m === latest ? 'true' : undefined}>
+                      <span class="d">{dayLabel(m.day)}</span>
+                      <span class="p">{m.placeName}</span>
+                      <span class="c">{formatLat(m.lat)}</span>
+                      <span class="t">{m.title}</span>
+                    </a>
+                  </li>
+                ))}
+              </ol>
+            </nav>
+          )
+        }
+      </section>
+
+      <div class="map">
+        <div id="globe" role="region" aria-label="Wereldkaart met posts"></div>
+        <p class="legend mono">{markers.length} {markers.length === 1 ? 'post' : 'posts'} · {km} km<span class="drag"> · sleep om te draaien</span></p>
+        <aside id="preview" class="card" hidden aria-live="polite"></aside>
+      </div>
+    </main>
+  </div>
 
   <script id="globe-data" type="application/json" set:html={JSON.stringify(globeData)} />
 </Base>
@@ -67,17 +90,218 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
 <script>
   import { initGlobe } from '../scripts/globe';
   initGlobe();
-
-  // Oldest post first: start scrolled to the end so the latest day is in view.
-  const timeline = document.querySelector('.timeline ol');
-  if (timeline) timeline.scrollLeft = timeline.scrollWidth;
 </script>
 
 <style>
+  .page {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    height: 100dvh;
+  }
+
+  .top {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.125rem 2.5rem;
+    border-bottom: 1px solid var(--ink);
+  }
+
+  .live::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 0.5rem;
+    border-radius: 50%;
+    background: var(--verm);
+    vertical-align: 1px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+    min-height: 0;
+  }
+
+  .intro {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding: 2.5rem;
+    border-right: 1px solid var(--line);
+  }
+
+  h1 {
+    margin: 0;
+    max-width: 14ch;
+    font: 400 clamp(2.75rem, 4.6vw, 4rem) / 0.98 var(--display);
+    letter-spacing: -0.03em;
+    text-wrap: balance;
+    animation: rise 300ms ease-out both;
+  }
+
+  h1 em {
+    color: var(--verm);
+    font-style: italic;
+  }
+
+  .subscribe {
+    margin-top: 1rem;
+    color: var(--ink);
+  }
+
+  .index {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    margin-top: 2rem;
+  }
+
+  .idx {
+    margin: 0;
+    padding: 0;
+    overflow: auto;
+    list-style: none;
+    border-top: 1px solid var(--ink);
+  }
+
+  .idx a {
+    display: grid;
+    grid-template-columns: 4.5rem minmax(0, 1fr) auto;
+    gap: 2px 1rem;
+    align-items: baseline;
+    padding: 0.875rem 0;
+    border-bottom: 1px solid var(--line);
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .idx a:focus-visible {
+    outline-offset: -2px;
+  }
+
+  .d,
+  .c {
+    color: var(--mute);
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.03em;
+  }
+
+  .c {
+    font-size: 0.75rem;
+  }
+
+  .p {
+    font: 500 1.375rem / 1.15 var(--display);
+    transition: color 150ms ease;
+  }
+
+  .idx a:hover .p,
+  .idx a:focus-visible .p,
+  .idx a[aria-current='true'] .p {
+    color: var(--verm-tekst);
+  }
+
+  .t {
+    grid-column: 2 / 4;
+    color: var(--mute);
+    font-size: 1rem;
+  }
+
+  .empty {
+    margin: 2rem 0 0;
+    color: var(--mute);
+  }
+
+  .map {
+    position: relative;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   #globe {
-    position: fixed;
+    position: absolute;
     inset: 0;
     background: var(--paper);
+  }
+
+  .legend {
+    position: absolute;
+    left: 1.75rem;
+    bottom: 1.5rem;
+    margin: 0;
+    padding: 0.125rem 0.375rem;
+    background: var(--paper);
+    color: var(--mute);
+    pointer-events: none;
+  }
+
+  /* The drag hint only once there is a globe to drag. */
+  .map:not(:global(.ready)) .drag {
+    display: none;
+  }
+
+  @media (max-width: 699.98px) {
+    .page {
+      display: block;
+      height: auto;
+    }
+
+    .top {
+      padding: 0.875rem 1.25rem;
+    }
+
+    .coords {
+      display: none;
+    }
+
+    .grid {
+      grid-template-columns: 1fr;
+    }
+
+    .map {
+      order: -1;
+      height: 300px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .intro {
+      padding: 1.375rem 1.25rem 2.5rem;
+      border-right: 0;
+    }
+
+    h1 {
+      font-size: 2.25rem;
+    }
+
+    .index {
+      margin-top: 1.25rem;
+    }
+
+    .idx {
+      overflow: visible;
+    }
+
+    .idx a {
+      grid-template-columns: 3.6rem minmax(0, 1fr);
+    }
+
+    .c {
+      display: none;
+    }
+
+    .t {
+      grid-column: 2;
+    }
+
+    .legend {
+      left: 1.25rem;
+      right: 2.75rem;
+      bottom: 0.875rem;
+      font-size: 0.75rem;
+    }
   }
 
   :global(.globe-rim) {
@@ -91,166 +315,96 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
   }
 
   .card {
-    position: fixed;
+    position: absolute;
     z-index: 2;
-    left: 50%;
-    top: max(1rem, env(safe-area-inset-top));
-    transform: translateX(-50%);
-    width: min(22rem, calc(100% - 2rem));
-    max-height: 50dvh;
+    top: 1rem;
+    right: 1rem;
+    width: min(20rem, calc(100% - 2rem));
+    max-height: calc(100% - 2rem);
     overflow: auto;
     background: var(--paper);
-    border: 1px solid var(--line);
-    border-radius: 0.25rem;
-    box-shadow: 0 1rem 3rem rgb(27 31 26 / 0.18);
+    border: 1px solid var(--ink);
     animation: rise 200ms ease-out;
   }
 
-  .timeline {
-    position: fixed;
-    z-index: 1;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    padding: 0.75rem 0 max(0.75rem, env(safe-area-inset-bottom));
-    background: linear-gradient(transparent, rgb(243 238 228 / 0.96) 35%);
-    pointer-events: none;
-  }
-
-  .timeline > * {
-    pointer-events: auto;
-  }
-
-  .timeline header {
-    background: var(--paper);
-    padding-top: 0.5rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-end;
-    padding-inline: 1rem;
-    padding-bottom: 0.5rem;
-  }
-
-  hgroup {
-    min-width: 0;
-  }
-
-  .title {
-    margin: 0;
-    font-size: 1.5rem;
-    font-style: italic;
-    font-weight: 500;
-    letter-spacing: -0.01em;
-  }
-
-  .tagline {
-    margin: 0.1rem 0 0;
-    color: var(--mute);
-    font-size: 0.95rem;
-  }
-
-  .links a {
-    font-size: 0.95rem;
-    margin-left: 1rem;
-    text-decoration: none;
-  }
-
-  .timeline ol {
-    display: flex;
-    gap: 1rem;
-    margin: 0;
-    padding: 0 1rem;
-    list-style: none;
-    overflow-x: auto;
-    scroll-snap-type: x mandatory;
-    scroll-padding-inline: 1rem;
-    scrollbar-width: none;
-    /* Fade the edges so it is clear the row scrolls; the 1rem padding keeps the first and last card clear of it. */
-    mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
-  }
-
-  .timeline li {
-    flex: 0 0 auto;
-    scroll-snap-align: start;
-  }
-
-  .timeline li a {
-    display: grid;
-    width: 10rem;
-    color: var(--ink);
-    text-decoration: none;
-  }
-
-  .timeline img,
-  .no-photo {
+  :global(.card img) {
     display: block;
     width: 100%;
     aspect-ratio: 3 / 2;
     object-fit: cover;
-    margin-bottom: 0.5rem;
-    border-radius: 0.125rem;
-    background: var(--line);
-    outline: 2px solid transparent;
-    outline-offset: 2px;
-    transition:
-      outline-color 150ms ease,
-      translate 150ms ease;
+    border-bottom: 1px solid var(--ink);
   }
 
-  .timeline li a:hover img,
-  .timeline li a:hover .no-photo {
-    translate: 0 -2px;
+  @media (max-width: 699.98px) {
+    :global(.card img) {
+      display: none;
+    }
   }
 
-  .timeline li a:hover img,
-  .timeline li a[aria-current='true'] img,
-  .timeline li a:hover .no-photo,
-  .timeline li a[aria-current='true'] .no-photo {
-    outline-color: var(--verm);
+  :global(.card .content) {
+    padding: 0.875rem 1rem 1rem;
   }
 
-  .day {
+  :global(.card .label) {
+    display: block;
     color: var(--verm-tekst);
-    font-size: 0.85rem;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
   }
 
-  .place {
-    font-size: 1.25rem;
-    font-style: italic;
-    line-height: 1.15;
-  }
-
-  :global(.card .place) {
-    color: var(--verm-tekst);
-    font-size: 1rem;
-    font-style: italic;
-  }
-
-  .post-title {
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow: hidden;
-    color: var(--mute);
-    font-size: 0.9rem;
-    line-height: 1.3;
-  }
-
-  :global(.card .date),
-  .empty {
-    color: var(--mute);
-    font-size: 0.9rem;
+  :global(.card h2) {
+    margin: 0.35rem 0 0.5rem;
+    font: 400 1.5rem / 1.1 var(--display);
+    letter-spacing: -0.015em;
   }
 
   :global(.card .date) {
     display: block;
-    margin: -0.5rem 0 0.9rem;
+    margin-bottom: 0.875rem;
+    color: var(--mute);
+    font-family: var(--mono);
+    font-size: 0.75rem;
   }
 
-  .empty {
-    padding: 0 1rem;
+  :global(.card .read) {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+  }
+
+  :global(.card ul) {
     margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--ink);
+  }
+
+  :global(.card li) {
+    border-bottom: 1px solid var(--line);
+  }
+
+  :global(.card li a) {
+    display: block;
+    padding: 0.6rem 0;
+    color: var(--ink);
+    text-decoration: none;
+  }
+
+  :global(.card li a:hover) {
+    color: var(--verm-tekst);
+  }
+
+  :global(.card .close) {
+    float: right;
+    margin: -0.25rem -0.25rem 0 0;
+    padding: 0.25rem;
+    border: 0;
+    background: none;
+    color: var(--mute);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
   }
 
   :global(.pulse) {
@@ -258,6 +412,7 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     place-items: center;
     width: 24px;
     height: 24px;
+    padding: 0;
     border-radius: 50%;
     /* The darker accent keeps the paper-coloured day number at 4.7:1. */
     background: var(--verm-tekst);
@@ -265,7 +420,6 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     color: var(--paper);
     font: 500 11px/1 var(--mono);
     cursor: pointer;
-    padding: 0;
     transition: scale 150ms ease;
   }
 
@@ -294,55 +448,5 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     :global(.pulse::after) {
       animation: none;
     }
-  }
-
-  :global(.card img) {
-    display: block;
-    width: 100%;
-    aspect-ratio: 3 / 2;
-    object-fit: cover;
-    border-radius: 0.25rem 0.25rem 0 0;
-  }
-
-  :global(.card .content) {
-    padding: 0.9rem 1rem 1rem;
-  }
-
-  :global(.card h2) {
-    font-size: 1.5rem;
-    font-weight: 500;
-    line-height: 1.15;
-    margin: 0.2rem 0 0.75rem;
-  }
-
-  :global(.card ul) {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-
-  :global(.card li + li) {
-    border-top: 1px solid var(--line);
-  }
-
-  :global(.card li a) {
-    display: block;
-    padding: 0.6rem 0;
-    color: var(--ink);
-    text-decoration: none;
-  }
-
-  :global(.card .read) {
-    font-weight: 600;
-  }
-
-  :global(.card .close) {
-    float: right;
-    background: none;
-    border: 0;
-    color: var(--mute);
-    font-size: 1.25rem;
-    line-height: 1;
-    cursor: pointer;
   }
 </style>
