@@ -5,6 +5,13 @@ place: Cartagena, Colombia
 lat: 10.39
 lng: -75.51
 cover: https://www.flickr.com/photos/bohemiannie/16286625671/
+facts:
+  - label: Vlucht
+    value: 1 uur
+  - label: Temperatuur
+    value: "30°"
+  - label: Stadsmuur
+    value: 11 km
 draft: false
 ---
 
