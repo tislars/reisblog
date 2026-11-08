@@ -339,7 +339,10 @@ export function initGlobe() {
       el.textContent = String(latest.day);
       el.setAttribute('aria-label', `Nu: dag ${latest.day} in ${latest.place}`);
       el.addEventListener('click', () => preview.show([latest]));
-      new Marker({ element: el, opacityWhenCovered: 0 }).setLngLat(lngLat(latest)).addTo(map);
+      // MapLibre positions the marker with a transform, which the hover scale would multiply; keep them on separate elements.
+      const wrap = document.createElement('div');
+      wrap.append(el);
+      new Marker({ element: wrap, opacityWhenCovered: 0 }).setLngLat(lngLat(latest)).addTo(map);
     }
     const { clientWidth: width, clientHeight: height } = map.getContainer();
     const arrival = Math.max(MIN_ZOOM, zoomForGlobeRadius(GLOBE_FIT * Math.min(width, height), focus.lat, height));
