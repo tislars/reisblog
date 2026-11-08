@@ -41,4 +41,4 @@ https://www.flickr.com/photos/41111966@N04/34801709211/
 
 We sloten de eerste week af op de stadsmuur bij zonsondergang, met een koude limonada de coco: limoensap, kokosmelk en ijs, door de blender gehaald. Om ons heen zaten stelletjes, families en een groep studenten met een speaker. De zon zakte in de zee en iedereen klapte, zoals op een vliegtuig dat geland is.
 
-Een week geleden landden we in de kou van Bogotá. Sindsdien sliepen we in vijf bedden, reden we in jeeps en kabelbanen, beklommen we een rots en zagen we waspalmen in de mist. Morgen gaan we verder langs de kust, richting Santa Marta en het Tayrona-park. We hebben er zin in.
+Een week geleden landden we in de kou van Bogotá. Sindsdien sliepen we in vier bedden, reden we in jeeps en kabelbanen, beklommen we een rots en zagen we waspalmen in de mist. Morgen gaan we verder langs de kust, richting Santa Marta en het Tayrona-park. We hebben er zin in.
