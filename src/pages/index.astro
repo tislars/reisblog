@@ -1,35 +1,42 @@
 ---
 import 'maplibre-gl/dist/maplibre-gl.css';
 import Base from '../layouts/Base.astro';
-import { ACCENT, HOME, SITE_TITLE, SUBSCRIBE_URL } from '../config';
-import { getPhoto } from '../lib/flickr';
+import { ACCENT, HOME, SITE_DESCRIPTION, SITE_TITLE, SUBSCRIBE_URL } from '../config';
+import { getPhoto, srcset } from '../lib/flickr';
 import { formatDate, getPosts } from '../lib/posts';
 
 const posts = await getPosts();
 const markers = await Promise.all(
-  posts.map(async (post) => ({
-    url: post.url,
-    title: post.entry.data.title,
-    place: post.entry.data.place,
-    date: formatDate(post.entry.data.date),
-    day: post.day,
-    lat: post.lat,
-    lng: post.lng,
-    thumb: post.coverId ? (await getPhoto(post.coverId)).thumb.src : undefined,
-  })),
+  posts.map(async (post) => {
+    const cover = post.coverId ? await getPhoto(post.coverId) : undefined;
+    return {
+      url: post.url,
+      title: post.entry.data.title,
+      place: post.entry.data.place,
+      date: formatDate(post.entry.data.date),
+      day: post.day,
+      lat: post.lat,
+      lng: post.lng,
+      thumb: cover?.thumb.src,
+      // Cards are at most 22rem wide; 800px covers them on 2x screens.
+      thumbSrcset: cover ? srcset(cover, 800) : undefined,
+    };
+  }),
 );
 const globeData = { posts: markers, home: HOME, accent: ACCENT };
 ---
 
 <Base theme="dark">
-  <h1 class="sr-only">{SITE_TITLE}</h1>
   <div id="globe" role="region" aria-label="Wereldkaart met posts"></div>
 
   <aside id="preview" class="card" hidden aria-live="polite"></aside>
 
   <section class="timeline" aria-label="Alle posts">
     <header>
-      <span class="title">{SITE_TITLE}</span>
+      <hgroup>
+        <h1 class="title">{SITE_TITLE}</h1>
+        <p class="tagline">{SITE_DESCRIPTION}</p>
+      </hgroup>
       <span class="links">
         {SUBSCRIBE_URL && <a href={SUBSCRIBE_URL}>Volgen per mail</a>}
       </span>
@@ -42,7 +49,7 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
           {markers.map((m) => (
             <li>
               <a href={m.url} data-fly={m.url}>
-                {m.thumb ? <img src={m.thumb} alt="" loading="lazy" decoding="async" /> : <span class="no-photo" />}
+                {m.thumb ? <img src={m.thumb} srcset={m.thumbSrcset} sizes="10rem" alt="" loading="lazy" decoding="async" /> : <span class="no-photo" />}
                 <span class="day">Dag {m.day}</span>
                 <span class="place">{m.place}</span>
                 <span class="post-title">{m.title}</span>
@@ -116,15 +123,26 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
   .timeline header {
     display: flex;
     justify-content: space-between;
-    align-items: baseline;
+    align-items: flex-end;
     padding: 0 1rem 0.5rem;
   }
 
+  hgroup {
+    min-width: 0;
+  }
+
   .title {
+    margin: 0;
     font-size: 1.5rem;
     font-style: italic;
     font-weight: 500;
     letter-spacing: -0.01em;
+  }
+
+  .tagline {
+    margin: 0.1rem 0 0;
+    color: var(--muted);
+    font-size: 0.95rem;
   }
 
   .links a {
@@ -141,7 +159,10 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
     list-style: none;
     overflow-x: auto;
     scroll-snap-type: x mandatory;
+    scroll-padding-inline: 1rem;
     scrollbar-width: none;
+    /* Fade the edges so it is clear the row scrolls; the 1rem padding keeps the first and last card clear of it. */
+    mask-image: linear-gradient(to right, transparent, #000 1.5rem, #000 calc(100% - 1.5rem), transparent);
   }
 
   .timeline li {
@@ -202,11 +223,14 @@ const globeData = { posts: markers, home: HOME, accent: ACCENT };
   }
 
   .post-title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
     color: var(--muted);
     font-size: 0.9rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    line-height: 1.3;
   }
 
   :global(.card .date),

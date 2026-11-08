@@ -2,7 +2,8 @@ import { Map as MapLibreMap, Marker, setWorkerUrl, type GeoJSONSource, type LngL
 // MapLibre looks for its worker next to its own module, which no longer exists once bundled.
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { escapeHtml } from '../lib/html';
-import { snapZoom, stepZoom, zoomLevels } from '../lib/zoom';
+import { minZoomFor } from '../lib/mapstyle';
+import { arrivalZoom, snapZoom, stepZoom, zoomLevels } from '../lib/zoom';
 
 interface GlobePost {
   url: string;
@@ -13,6 +14,7 @@ interface GlobePost {
   lat: number;
   lng: number;
   thumb?: string;
+  thumbSrcset?: string;
 }
 
 interface GlobeData {
@@ -31,7 +33,6 @@ const SEA = '#24435a';
 const LAND = '#55664d';
 const BUILDING = '#4a5943';
 const STROKE = '#eef0eb';
-const LABEL_MIN_ZOOM = 4;
 const MIN_ZOOM = 1;
 const ARRIVAL_ZOOM = 3;
 const POST_ZOOM = 5;
@@ -69,9 +70,8 @@ function restyle(map: MapLibreMap) {
     if (layer.type === 'fill' && /^(landcover|landuse)/.test(layer.id)) {
       map.setPaintProperty(layer.id, 'fill-color', LAND);
     }
-    if (layer.type === 'symbol') {
-      map.setLayerZoomRange(layer.id, Math.max(LABEL_MIN_ZOOM, layer.minzoom ?? 0), layer.maxzoom ?? 24);
-    }
+    const minzoom = minZoomFor(layer as Parameters<typeof minZoomFor>[0]);
+    if (minzoom !== undefined) map.setLayerZoomRange(layer.id, minzoom, layer.maxzoom ?? 24);
   }
 }
 
@@ -136,7 +136,7 @@ function createPreview(posts: GlobePost[]) {
     const close = '<button class="close" type="button" aria-label="Sluiten">×</button>';
     if (items.length === 1) {
       const [p] = items;
-      card.innerHTML = `${p.thumb ? `<img src="${escapeHtml(p.thumb)}" alt="">` : ''}<div class="content">${close}<span class="place">Dag ${p.day} in ${escapeHtml(p.place)}</span><h2>${escapeHtml(p.title)}</h2><span class="date">${escapeHtml(p.date)}</span><a class="read" href="${escapeHtml(p.url)}">Lees verder</a></div>`;
+      card.innerHTML = `${p.thumb ? `<img src="${escapeHtml(p.thumb)}"${p.thumbSrcset ? ` srcset="${escapeHtml(p.thumbSrcset)}" sizes="min(22rem, 100vw - 2rem)"` : ''} alt="">` : ''}<div class="content">${close}<span class="place">Dag ${p.day} in ${escapeHtml(p.place)}</span><h2>${escapeHtml(p.title)}</h2><span class="date">${escapeHtml(p.date)}</span><a class="read" href="${escapeHtml(p.url)}">Lees verder</a></div>`;
     } else {
       const list = items
         .map((p) => `<li><a href="${escapeHtml(p.url)}"><span class="place">Dag ${p.day} in ${escapeHtml(p.place)}</span><br>${escapeHtml(p.title)}</a></li>`)
@@ -249,6 +249,10 @@ export function initGlobe() {
   });
 
   map.on('load', () => {
+    // The compact attribution starts expanded and then covers the timeline; start it collapsed (the ⓘ stays).
+    const attrib = map.getContainer().querySelector('.maplibregl-ctrl-attrib');
+    attrib?.classList.remove('maplibregl-compact-show');
+    attrib?.removeAttribute('open');
     addLayers(map, data);
     bindEvents(map, data, preview);
     const latest = data.posts.at(-1);
@@ -260,7 +264,8 @@ export function initGlobe() {
       el.addEventListener('click', () => preview.show([latest]));
       new Marker({ element: el }).setLngLat(lngLat(latest)).addTo(map);
     }
-    if (!saved) map.flyTo({ center: lngLat(focus), zoom: ARRIVAL_ZOOM, duration: 3000 });
+    const arrival = arrivalZoom(ARRIVAL_ZOOM, MIN_ZOOM, innerWidth, innerHeight);
+    if (!saved) map.flyTo({ center: lngLat(focus), zoom: arrival, duration: 3000 });
     else if ('url' in focus && focus.url === requested) map.flyTo({ center: lngLat(focus), zoom: Math.max(map.getZoom(), POST_ZOOM), duration: 1500 });
   });
 }

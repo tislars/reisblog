@@ -25,6 +25,8 @@ export interface FlickrPhoto {
   pageUrl: string;
   thumb: PhotoSize;
   large: PhotoSize;
+  /** Uncropped sizes up to LARGE_MAX_EDGE, smallest first, for srcset. */
+  variants: PhotoSize[];
 }
 
 interface RawSize {
@@ -49,21 +51,41 @@ export function photoIdsInHtml(html: string): string[] {
   return [...html.matchAll(HTML_PARAGRAPH)].flatMap((m) => idsInParagraph(m[1]));
 }
 
-export function pickSizes(sizes: RawSize[]): { thumb: PhotoSize; large: PhotoSize } {
+const edge = (s: PhotoSize) => Math.max(s.width, s.height);
+
+export function pickSizes(sizes: RawSize[]): { thumb: PhotoSize; large: PhotoSize; variants: PhotoSize[] } {
+  // Square sizes are crops; they would distort the photo in a srcset.
   const parsed = sizes
+    .filter((s) => !/square/i.test(s.label))
     .map((s) => ({ src: s.source, width: Number(s.width), height: Number(s.height) }))
-    .sort((a, b) => Math.max(a.width, a.height) - Math.max(b.width, b.height));
+    .sort((a, b) => edge(a) - edge(b));
   if (parsed.length === 0) throw new Error('Flickr returned no sizes');
-  const largestUpTo = (edge: number) =>
-    parsed.filter((s) => Math.max(s.width, s.height) <= edge).at(-1) ?? parsed[0];
-  return { thumb: largestUpTo(THUMB_MAX_EDGE), large: largestUpTo(LARGE_MAX_EDGE) };
+  const upTo = (max: number) => parsed.filter((s) => edge(s) <= max);
+  const largestUpTo = (max: number) => upTo(max).at(-1) ?? parsed[0];
+  const large = largestUpTo(LARGE_MAX_EDGE);
+  const variants = upTo(LARGE_MAX_EDGE);
+  return { thumb: largestUpTo(THUMB_MAX_EDGE), large, variants: variants.length ? variants : [large] };
 }
 
-function figure(photo: FlickrPhoto, inRow = false): string {
+/** A srcset of the photo's variants, optionally capped at a maximum edge (e.g. for small cards). */
+export function srcset(photo: Pick<FlickrPhoto, 'variants'>, maxEdge = Infinity): string {
+  const seen = new Set<number>();
+  return photo.variants
+    .filter((v) => edge(v) <= maxEdge && !seen.has(v.width) && seen.add(v.width))
+    .map((v) => `${v.src} ${v.width}w`)
+    .join(', ');
+}
+
+// Layout widths of photos in a post body (see .body figure.photo in [slug].astro: max 60rem).
+const figureSizes = (perRow: number) =>
+  perRow === 1 ? '(min-width: 60rem) 60rem, 100vw' : `(min-width: 60rem) ${60 / perRow}rem, ${Math.round(100 / perRow)}vw`;
+
+function figure(photo: FlickrPhoto, perRow = 1): string {
+  const inRow = perRow > 1;
   const caption = photo.title ? `<figcaption>${escapeHtml(photo.title)}</figcaption>` : '';
   // Flex-grow by aspect ratio gives every photo in a row the same height.
   const style = inRow ? ` style="flex: ${(photo.thumb.width / photo.thumb.height).toFixed(3)}"` : '';
-  return `<figure class="photo"${style}><a href="${escapeHtml(photo.large.src)}" data-pswp-width="${photo.large.width}" data-pswp-height="${photo.large.height}" data-flickr-page="${escapeHtml(photo.pageUrl)}" target="_blank" rel="noopener"><img src="${escapeHtml(photo.thumb.src)}" width="${photo.thumb.width}" height="${photo.thumb.height}" alt="${escapeHtml(photo.alt)}" loading="lazy" decoding="async"></a>${caption}</figure>`;
+  return `<figure class="photo"${style}><a href="${escapeHtml(photo.large.src)}" data-pswp-width="${photo.large.width}" data-pswp-height="${photo.large.height}" data-flickr-page="${escapeHtml(photo.pageUrl)}" target="_blank" rel="noopener"><img src="${escapeHtml(photo.thumb.src)}" srcset="${escapeHtml(srcset(photo))}" sizes="${figureSizes(perRow)}" width="${photo.thumb.width}" height="${photo.thumb.height}" alt="${escapeHtml(photo.alt)}" loading="lazy" decoding="async"></a>${caption}</figure>`;
 }
 
 export async function embedFlickrPhotos(
@@ -76,7 +98,7 @@ export async function embedFlickrPhotos(
   }
   const photos = new Map(await Promise.all(ids.map(async (id) => [id, await fetchPhoto(id)] as const)));
   return html.replace(HTML_PARAGRAPH, (_, inner: string) => {
-    const row = idsInParagraph(inner).map((id, _i, all) => figure(photos.get(id)!, all.length > 1));
+    const row = idsInParagraph(inner).map((id, _i, all) => figure(photos.get(id)!, all.length));
     return row.length === 1 ? row[0] : `<div class="photo-row">${row.join('')}</div>`;
   });
 }
@@ -91,18 +113,34 @@ async function callApi<T>(method: string, photoId: string): Promise<T> {
   return json as T;
 }
 
-const stripTags = (html: string) => html.replace(/<[^>]*>/g, '').trim();
+const MAX_ALT_LENGTH = 150;
+// Default names from cameras and phones (IMG_4021, DSC-0012.jpg, PXL_20261107_…): not a caption.
+const CAMERA_FILE_NAME = /^(IMG|DSC[FN]?|PXL|GOPR|DJI|P\d{3}|_MG)[_-]?\d+(?:[_-]\d+)*(?:\.\w+)?$/i;
+
+const plainText = (html: string) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+
+/**
+ * Alt text and caption from a Flickr title and description. Flickr descriptions can be essays,
+ * so alt is the description only when short, else its first sentence, else the title.
+ */
+export function describePhoto(title: string, description: string): { alt: string; caption: string } {
+  const caption = CAMERA_FILE_NAME.test(title.trim()) ? '' : title.trim();
+  const text = plainText(description);
+  const firstSentence = text.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? text;
+  const alt = [text, firstSentence, caption].find((t) => t && t.length <= MAX_ALT_LENGTH) ?? 'Foto';
+  return { alt, caption };
+}
 
 async function fetchPhoto(id: string): Promise<FlickrPhoto> {
   const [info, sizes] = await Promise.all([
     callApi<{ photo: { title: { _content: string }; description: { _content: string }; urls: { url: { _content: string }[] } } }>('flickr.photos.getInfo', id),
     callApi<{ sizes: { size: RawSize[] } }>('flickr.photos.getSizes', id),
   ]);
-  const title = info.photo.title._content.trim();
+  const { alt, caption } = describePhoto(info.photo.title._content, info.photo.description._content);
   return {
     id,
-    title,
-    alt: stripTags(info.photo.description._content) || title,
+    title: caption,
+    alt,
     pageUrl: info.photo.urls.url[0]?._content ?? `https://www.flickr.com/photo.gne?id=${id}`,
     ...pickSizes(sizes.sizes.size),
   };

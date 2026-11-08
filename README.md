@@ -12,6 +12,7 @@ Open `https://tislars.github.io/admin/`, sign in with a GitHub token and create 
 2. **Flickr**: request a non-commercial API key at <https://www.flickr.com/services/apps/create/> and add it as the repository secret `FLICKR_API_KEY`. Photos must be public.
 3. **CMS login**: create a fine-grained token with *Contents: read and write* on this repository only, expiring after the trip. Use "Sign in with token" on `/admin`.
 4. **Optional**: set `GOATCOUNTER_CODE` and `SUBSCRIBE_URL` (an RSS-to-email service pointed at `/rss.xml`) in `src/config.ts`.
+5. **Optional, comments and reactions**: enable Discussions on a public repo, install the [giscus app](https://github.com/apps/giscus) on it, pick a category on <https://giscus.app> and copy `repo`, `repoId`, `category` and `categoryId` into `GISCUS` in `src/config.ts`. Comments stay off until all four are set.
 
 ## Development
 

@@ -1,7 +1,8 @@
 ---
 import 'photoswipe/style.css';
 import Base from '../../../layouts/Base.astro';
-import { embedFlickrPhotos, getPhoto } from '../../../lib/flickr';
+import { GISCUS } from '../../../config';
+import { embedFlickrPhotos, getPhoto, srcset } from '../../../lib/flickr';
 import { formatDate, getPosts, withBase, type Post } from '../../../lib/posts';
 
 export async function getStaticPaths() {
@@ -23,13 +24,14 @@ const { title, date, place, draft } = post.entry.data;
 const html = await embedFlickrPhotos(post.entry.rendered?.html ?? '');
 const cover = post.coverId ? await getPhoto(post.coverId) : undefined;
 const nextCover = next?.coverId ? await getPhoto(next.coverId) : undefined;
+const giscusEnabled = Object.values(GISCUS).every(Boolean);
 const globeLink = withBase(`/?post=${encodeURIComponent(post.url)}`);
 const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.replace(/[^a-z0-9-]/gi, '-')}`;
 ---
 
 <Base title={title} description={`Dag ${post.day} in ${place}, ${formatDate(date)}`} image={cover?.thumb.src}>
   <header class:list={['hero', { 'has-cover': cover }]}>
-    {cover && <img src={cover.large.src} width={cover.large.width} height={cover.large.height} alt={cover.alt} fetchpriority="high" style={coverTransition(post)} />}
+    {cover && <img src={cover.large.src} srcset={srcset(cover)} sizes="100vw" width={cover.large.width} height={cover.large.height} alt={cover.alt} fetchpriority="high" style={coverTransition(post)} />}
     <nav class="top">
       <a href={globeLink} class="back" aria-label="Terug naar de kaart" title="Terug naar de kaart">
         <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -51,11 +53,36 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
     </div>
   </header>
   <article class="body" set:html={html} />
+  {
+    giscusEnabled && (
+      <section class="comments" aria-label="Reacties">
+        <h2>Reacties</h2>
+        <script
+          is:inline
+          src="https://giscus.app/client.js"
+          data-repo={GISCUS.repo}
+          data-repo-id={GISCUS.repoId}
+          data-category={GISCUS.category}
+          data-category-id={GISCUS.categoryId}
+          data-mapping="pathname"
+          data-strict="1"
+          data-reactions-enabled="1"
+          data-emit-metadata="0"
+          data-input-position="top"
+          data-theme="light"
+          data-lang="nl"
+          data-loading="lazy"
+          crossorigin="anonymous"
+          async
+        />
+      </section>
+    )
+  }
   <nav class="pager" aria-label="Andere posts">
     {
       next && (
         <a href={next.url} class="next">
-          {nextCover && <img src={nextCover.thumb.src} alt="" loading="lazy" decoding="async" style={coverTransition(next)} />}
+          {nextCover && <img src={nextCover.thumb.src} srcset={srcset(nextCover, 1024)} sizes="(min-width: 36rem) 33.5rem, calc(100vw - 2.5rem)" alt="" loading="lazy" decoding="async" style={coverTransition(next)} />}
           <span class="next-label">Volgende: dag {next.day} in {next.entry.data.place}</span>
           <span class="next-title">{next.entry.data.title}</span>
         </a>
@@ -323,6 +350,18 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
     .body :global(figcaption) {
       padding-inline: 0;
     }
+  }
+
+  .comments {
+    max-width: 36rem;
+    margin: 4rem auto 0;
+    padding: 0 1.25rem;
+  }
+
+  .comments h2 {
+    margin: 0 0 1rem;
+    font-size: clamp(1.6rem, 4vw, 2rem);
+    font-weight: 400;
   }
 
   .pager {
