@@ -1,9 +1,11 @@
 ---
 import 'photoswipe/style.css';
 import Base from '../../../layouts/Base.astro';
-import { GISCUS } from '../../../config';
+import { GISCUS, TRIP_DAYS } from '../../../config';
 import { embedFlickrPhotos, getPhoto, srcset } from '../../../lib/flickr';
-import { formatDate, getPosts, withBase, type Post } from '../../../lib/posts';
+import { formatLatLng } from '../../../lib/geo';
+import { splitLead } from '../../../lib/html';
+import { formatDate, getPosts, placeName, withBase, type Post } from '../../../lib/posts';
 
 export async function getStaticPaths() {
   const posts = await getPosts();
@@ -20,43 +22,70 @@ interface Props {
 }
 
 const { post, prev, next } = Astro.props;
-const { title, date, place, draft } = post.entry.data;
-const html = await embedFlickrPhotos(post.entry.rendered?.html ?? '');
+const { title, date, place, draft, facts } = post.entry.data;
+const { lead, rest } = splitLead(await embedFlickrPhotos(post.entry.rendered?.html ?? ''));
 const cover = post.coverId ? await getPhoto(post.coverId) : undefined;
-const nextCover = next?.coverId ? await getPhoto(next.coverId) : undefined;
 const giscusEnabled = Object.values(GISCUS).every(Boolean);
+const giscusTheme = new URL(withBase('giscus-paper.css'), Astro.site ?? Astro.url).href;
 const globeLink = withBase(`/?post=${encodeURIComponent(post.url)}`);
-const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.replace(/[^a-z0-9-]/gi, '-')}`;
+const day = (n: number) => String(n).padStart(2, '0');
+// 1–4 facts on one row; 5–6 over two rows of three.
+const factColumns = facts.length > 4 ? Math.ceil(facts.length / 2) : facts.length;
 ---
 
 <Base title={title} description={`Dag ${post.day} in ${place}, ${formatDate(date)}`} image={cover?.thumb.src}>
-  <header class:list={['hero', { 'has-cover': cover }]}>
-    {cover && <img src={cover.large.src} srcset={srcset(cover)} sizes="100vw" width={cover.large.width} height={cover.large.height} alt={cover.alt} fetchpriority="high" style={coverTransition(post)} />}
-    <nav class="top">
-      <a href={globeLink} class="back" aria-label="Terug naar de kaart" title="Terug naar de kaart">
-        <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M15 18l-6-6 6-6" />
-        </svg>
-        <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="10" />
-          <path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
-        </svg>
-      </a>
-    </nav>
-    <div class="hero-text">
-      <p class="day">Dag {post.day} in {place}</p>
-      <h1>{title}</h1>
-      <p class="date">
+  <nav class="crumb mono" aria-label="Kruimelpad">
+    <div class="crumb-inner">
+      <a href={globeLink} class="back"><span aria-hidden="true">← </span>Kaart<span class="sr-only">: terug naar de kaart</span></a>
+      <span>DAG {day(post.day)} / ±{TRIP_DAYS}{draft && ' · CONCEPT'}</span>
+      <span class="crumb-date">
         <time datetime={date.toISOString().slice(0, 10)}>{formatDate(date)}</time>
-        {draft && <strong>, concept</strong>}
-      </p>
+      </span>
     </div>
+  </nav>
+
+  <main>
+  <header class="head">
+    <p class="stamp mono">{place} — {formatLatLng(post)}</p>
+    <h1>{title}</h1>
+    {lead && <p class="lead" set:html={lead} />}
+    {
+      facts.length > 0 && (
+        <dl class="facts" data-cols={factColumns} style={`--cols: ${factColumns}`}>
+          {facts.map((fact) => (
+            <div>
+              <dt class="mono">{fact.label}</dt>
+              <dd>{fact.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )
+    }
   </header>
-  <article class="body" set:html={html} />
+
+  {
+    cover && (
+      <figure class="cover">
+        <img
+          src={cover.large.src}
+          srcset={srcset(cover)}
+          sizes="(min-width: 1100px) 1020px, 100vw"
+          width={cover.large.width}
+          height={cover.large.height}
+          alt={cover.alt}
+          fetchpriority="high"
+        />
+        <figcaption class="mono">{cover.title}</figcaption>
+      </figure>
+    )
+  }
+
+  <article class="body" style={`counter-reset: fig ${cover ? 1 : 0} section`} set:html={rest} />
+
   {
     giscusEnabled && (
-      <section class="comments" aria-label="Reacties">
-        <h2>Reacties</h2>
+      <section class="comments" aria-labelledby="reacties">
+        <h2 id="reacties">Reacties</h2>
         <script
           is:inline
           src="https://giscus.app/client.js"
@@ -69,7 +98,7 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
           data-reactions-enabled="1"
           data-emit-metadata="0"
           data-input-position="top"
-          data-theme="light"
+          data-theme={giscusTheme}
           data-lang="nl"
           data-loading="lazy"
           crossorigin="anonymous"
@@ -78,18 +107,24 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
       </section>
     )
   }
+
   <nav class="pager" aria-label="Andere posts">
     {
       next && (
         <a href={next.url} class="next">
-          {nextCover && <img src={nextCover.thumb.src} srcset={srcset(nextCover, 1024)} sizes="(min-width: 36rem) 33.5rem, calc(100vw - 2.5rem)" alt="" loading="lazy" decoding="async" style={coverTransition(next)} />}
-          <span class="next-label">Volgende: dag {next.day} in {next.entry.data.place}</span>
-          <span class="next-title">{next.entry.data.title}</span>
+          <span class="next-text">
+            <span class="mono">VOLGENDE · DAG {day(next.day)}</span>
+            <span class="next-title">
+              {placeName(next.entry.data.place)}: {next.entry.data.title}
+            </span>
+          </span>
+          <img class="mini-globe" src={withBase(`globe/${next.entry.id}.svg`)} width="200" height="200" alt="" loading="lazy" decoding="async" />
         </a>
       )
     }
-    {prev && <a href={prev.url} class="prev">Vorige: {prev.entry.data.place}</a>}
+    {prev && <a href={prev.url} class="prev mono"><span aria-hidden="true">← </span>Vorige: dag {day(prev.day)}, {placeName(prev.entry.data.place)}</a>}
   </nav>
+  </main>
 </Base>
 
 <script>
@@ -139,86 +174,259 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
 </script>
 
 <style>
-  .hero {
-    position: relative;
-    display: grid;
-    align-content: space-between;
-    max-width: 60rem;
-    margin: 0 auto;
-    padding: 1.25rem 1.25rem 0;
+  /* Page width as in the design: 1100px including 40px padding each side (see PAGE_WIDTH in lib/flickr.ts). */
+  .head,
+  .cover,
+  .body,
+  .comments,
+  .pager {
+    max-width: 1100px;
+    margin-inline: auto;
+    padding-inline: 2.5rem;
   }
 
-  .hero.has-cover {
-    max-width: none;
-    min-height: min(85svh, 52rem);
-    padding-bottom: clamp(2rem, 6vw, 4rem);
-    color: var(--paper);
-    background: var(--ink);
+  /* The crumb bar replaces the floating back button (story 02): it stays at the top while reading. */
+  .crumb {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    padding: 1.75rem 2.5rem 0;
+    background: var(--paper);
   }
 
-  .hero img {
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .hero.has-cover::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(rgb(27 31 26 / 0.45), transparent 25%, transparent 45%, rgb(27 31 26 / 0.85));
-  }
-
-  .top,
-  .hero-text {
-    position: relative;
-    z-index: 1;
+  .crumb-inner {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    max-width: 1020px;
+    margin-inline: auto;
+    padding-bottom: 0.875rem;
+    border-bottom: 1px solid var(--ink);
   }
 
   .back {
-    position: fixed;
-    top: max(1rem, env(safe-area-inset-top));
-    left: max(1rem, env(safe-area-inset-left));
-    z-index: 10;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.25rem;
-    padding: 0.6rem 0.9rem 0.6rem 0.7rem;
-    border: 1px solid rgb(243 238 228 / 0.18);
-    border-radius: 999px;
-    background: rgb(27 31 26 / 0.82);
-    backdrop-filter: blur(8px);
-    box-shadow: 0 4px 16px rgb(27 31 26 / 0.25);
-    color: var(--paper);
-    font-size: 1rem;
-    line-height: 1;
     text-decoration: none;
-    transition:
-      background-color 150ms ease,
-      color 150ms ease;
   }
 
-  .back:hover,
-  .back:focus-visible {
-    background: var(--paper);
-    color: var(--ink);
+  .back:hover {
+    color: var(--verm-tekst);
   }
 
-  .back:focus-visible {
-    outline: 2px solid var(--ink);
-    outline-offset: 2px;
-    box-shadow: 0 0 0 2px var(--paper);
+  .crumb-date {
+    text-transform: uppercase;
   }
 
-  .hero-text,
-  .body > :global(:nth-child(-n + 2)) {
+  .head > *,
+  .cover {
     animation: rise 300ms ease-out both;
   }
 
-  .body > :global(:nth-child(-n + 2)) {
+  @media (prefers-reduced-motion: reduce) {
+    .head > *,
+    .cover {
+      animation-delay: 0ms !important;
+    }
+  }
+
+  .stamp {
+    margin: 3rem 0 0;
+    color: var(--verm-tekst);
+    text-transform: uppercase;
+  }
+
+  h1 {
+    max-width: 12ch;
+    margin: 0.625rem 0 0;
+    font: 400 clamp(3rem, 8.5vw, 6rem) / 0.92 var(--display);
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+  }
+
+  .lead {
+    max-width: 34ch;
+    margin: 1.75rem 0 0;
+    font-size: 1.625rem;
+    line-height: 1.4;
+    animation-delay: 60ms;
+  }
+
+  .facts {
+    display: grid;
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    margin: 2.5rem 0 0;
+    overflow: hidden;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
     animation-delay: 100ms;
+  }
+
+  /* Lines between cells: each cell draws its left and top line; the first column's left line and the first
+     row's top line fall outside the clipped box, where the box's own border takes over. */
+  .facts > div {
+    margin: -1px 0 0 -1px;
+    padding: 0.75rem 1rem;
+    border-left: 1px solid var(--line);
+    border-top: 1px solid var(--line);
+  }
+
+  .facts dt {
+    color: var(--mute);
+    text-transform: uppercase;
+  }
+
+  .facts dd {
+    margin: 0.25rem 0 0;
+    font: 500 1.25rem / 1.2 var(--display);
+  }
+
+  .cover {
+    margin-block: 2.5rem 0;
+    animation-delay: 140ms;
+  }
+
+  .cover img {
+    display: block;
+    width: 100%;
+    height: auto;
+    aspect-ratio: 16 / 9;
+    object-fit: cover;
+    background: var(--line);
+  }
+
+  /* Captions are numbered FIG. 1, FIG. 2, …: the cover is 1, photos in the text count on from it. */
+  .cover figcaption::before,
+  .body :global(figcaption::before) {
+    content: 'FIG. ' counter(fig);
+    margin-right: 0.75rem;
+    color: var(--verm-tekst);
+  }
+
+  .cover figcaption::before {
+    content: 'FIG. 1';
+  }
+
+  .cover figcaption,
+  .body :global(figcaption) {
+    margin-top: 0.625rem;
+    color: var(--mute);
+  }
+
+  .body :global(figcaption) {
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    letter-spacing: 0.03em;
+  }
+
+  .body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 38rem) minmax(0, 1fr);
+    column-gap: 2.5rem;
+    padding-block: 3rem 2rem;
+    font-size: 1.25rem;
+    line-height: 1.72;
+    overflow-wrap: anywhere;
+  }
+
+  .body > :global(*) {
+    grid-column: 2;
+  }
+
+  .body :global(p) {
+    margin: 0 0 1.1em;
+  }
+
+  .body :global(h2) {
+    display: flex;
+    gap: 0.875rem;
+    align-items: baseline;
+    margin: 1.5em 0 0.4em;
+    font: 500 1.875rem / 1.15 var(--display);
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    counter-increment: section;
+  }
+
+  .body :global(h2::before) {
+    content: counter(section, decimal-leading-zero);
+    flex: none;
+    color: var(--verm-tekst);
+    font-family: var(--mono);
+    font-size: 0.8125rem;
+    font-weight: 400;
+    letter-spacing: 0.03em;
+  }
+
+  .body :global(h2:first-child) {
+    margin-top: 0;
+  }
+
+  .body :global(ul) {
+    margin: 0 0 1.1em;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--line);
+  }
+
+  .body :global(ul li) {
+    position: relative;
+    padding: 0.625rem 0 0.625rem 1.6rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .body :global(ul li::before) {
+    content: '—';
+    position: absolute;
+    left: 0;
+    color: var(--verm);
+  }
+
+  .body :global(ol) {
+    padding-left: 1.6rem;
+  }
+
+  .body :global(blockquote) {
+    margin: 0 0 1.1em;
+    padding-left: 1.25rem;
+    border-left: 2px solid var(--verm);
+    font-style: italic;
+  }
+
+  /* Photos break out of the text column to the full page width. */
+  .body :global(figure.photo),
+  .body :global(.photo-row) {
+    grid-column: 1 / -1;
+    margin: 1em 0 1.6em;
+    counter-increment: fig;
+  }
+
+  .body :global(.photo-row) {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
+    gap: 1rem;
+    counter-increment: none;
+  }
+
+  .body :global(.photo-row figure.photo) {
+    grid-column: auto;
+    margin: 0;
+  }
+
+  .body :global(figure.photo img) {
+    display: block;
+    width: 100%;
+    height: auto;
+    background: var(--line);
+  }
+
+  /* A lone photo spans the page, but a portrait one no taller than the screen (--ar is set per photo). */
+  .body > :global(figure.photo img) {
+    width: min(100%, 85svh * var(--ar, 10));
+  }
+
+  .body :global(.photo-row figure.photo img) {
+    aspect-ratio: 4 / 5;
+    object-fit: cover;
   }
 
   .body :global(figure.photo.reveal) {
@@ -234,183 +442,149 @@ const coverTransition = (p: Post) => `view-transition-name: cover-${p.entry.id.r
     translate: none;
   }
 
-  .hero-text {
-    max-width: 48rem;
-    margin-top: clamp(3rem, 10vw, 6rem);
-  }
-
-  .has-cover .hero-text {
-    width: 100%;
-    max-width: 60rem;
-    margin-inline: auto;
-  }
-
-  .day {
-    margin: 0 0 0.5rem;
-    color: var(--verm-tekst);
-    font-size: clamp(1.15rem, 2.5vw, 1.5rem);
-    font-style: italic;
-  }
-
-  .has-cover .day {
-    color: inherit;
-  }
-
-  h1 {
-    margin: 0;
-    font-size: clamp(2.5rem, 8vw, 5.5rem);
-    font-weight: 400;
-    line-height: 0.98;
-    letter-spacing: -0.025em;
-    text-wrap: balance;
-  }
-
-  .date {
-    margin: 1rem 0 0;
-    color: var(--mute);
-  }
-
-  .has-cover .date {
-    color: inherit;
-    opacity: 0.85;
-  }
-
-  .body {
-    display: grid;
-    grid-template-columns: 1fr min(36rem, 100% - 2.5rem) 1fr;
-    margin-top: clamp(2.5rem, 6vw, 4rem);
-    font-size: 1.2rem;
-    line-height: 1.75;
-    overflow-wrap: anywhere;
-  }
-
-  .body > :global(*) {
-    grid-column: 2;
-  }
-
-  .body :global(h2) {
-    margin: 2.5rem 0 0.25rem;
-    font-size: clamp(1.6rem, 4vw, 2rem);
-    font-weight: 400;
-    line-height: 1.15;
-    letter-spacing: -0.015em;
-    text-wrap: balance;
-  }
-
-  .body :global(ul) {
-    padding-left: 1.25rem;
-  }
-
-  .body :global(li + li) {
-    margin-top: 0.35rem;
-  }
-
-  .body :global(ul li::marker) {
-    color: var(--verm);
-  }
-
-  .body :global(figure.photo),
-  .body :global(.photo-row) {
-    grid-column: 1 / -1;
-    justify-self: center;
-    width: min(60rem, 100%);
-    margin: 2.5rem 0;
-  }
-
-  .body :global(.photo-row) {
-    display: flex;
-    gap: 0.5rem;
-  }
-
-  .body :global(.photo-row figure.photo) {
-    width: auto;
-    min-width: 0;
-    margin: 0;
-  }
-
-  .body :global(.photo-row figcaption) {
-    padding-inline: 0.5rem;
-  }
-
-  .body :global(figure.photo img) {
-    display: block;
-    width: 100%;
-    height: auto;
-    background: var(--line);
-  }
-
-  .body :global(figcaption) {
-    color: var(--mute);
-    font-size: 0.95rem;
-    font-style: italic;
-    padding: 0.6rem 1.25rem 0;
-  }
-
-  @media (min-width: 62rem) {
-    .body :global(figcaption) {
-      padding-inline: 0;
-    }
-  }
-
   .comments {
-    max-width: 36rem;
-    margin: 4rem auto 0;
-    padding: 0 1.25rem;
+    display: grid;
+    grid-template-columns: minmax(0, 38rem);
+    justify-content: center;
+    padding-bottom: 2rem;
   }
 
   .comments h2 {
     margin: 0 0 1rem;
-    font-size: clamp(1.6rem, 4vw, 2rem);
-    font-weight: 400;
+    font: 500 1.875rem / 1.15 var(--display);
   }
 
   .pager {
     display: grid;
-    gap: 1.5rem;
-    max-width: 36rem;
-    margin: 4rem auto 0;
-    padding: 2rem 1.25rem 4rem;
-    border-top: 1px solid var(--line);
+    gap: 1.25rem;
+    padding-bottom: 5rem;
   }
 
   .next {
     display: grid;
-    gap: 0.25rem;
-    color: var(--ink);
+    grid-template-columns: minmax(0, 1fr) 200px;
+    gap: 1.5rem;
+    align-items: center;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--ink);
+    color: inherit;
     text-decoration: none;
   }
 
-  .next img {
-    transition: opacity 150ms ease;
-    width: 100%;
-    aspect-ratio: 3 / 2;
-    object-fit: cover;
-    margin-bottom: 0.75rem;
-  }
-
-  .next-label {
-    color: var(--verm-tekst);
-    font-style: italic;
-  }
-
   .next-title {
-    font-size: clamp(1.75rem, 5vw, 2.5rem);
-    line-height: 1.05;
+    display: block;
+    margin-top: 0.375rem;
+    font: 400 2.75rem / 1 var(--display);
     letter-spacing: -0.02em;
-  }
-
-  .next:hover img {
-    opacity: 0.88;
-  }
-
-  .next-title {
+    text-wrap: balance;
     text-decoration: underline transparent;
     text-decoration-thickness: 1px;
+    text-underline-offset: 0.15em;
     transition: text-decoration-color 150ms ease;
   }
 
   .next:hover .next-title {
-    text-decoration-color: currentColor;
+    text-decoration-color: var(--verm);
+  }
+
+  .mini-globe {
+    width: 200px;
+    height: 200px;
+  }
+
+  .prev {
+    justify-self: start;
+    color: var(--mute);
+  }
+
+  @media (min-width: 700px) {
+    /* No left line or padding on the first column; which cells start a row depends on the column count. */
+    .facts[data-cols='1'] > :nth-child(1n + 1),
+    .facts[data-cols='2'] > :nth-child(2n + 1),
+    .facts[data-cols='3'] > :nth-child(3n + 1),
+    .facts[data-cols='4'] > :nth-child(4n + 1) {
+      padding-left: 0;
+    }
+  }
+
+  @media (max-width: 699.98px) {
+    .crumb,
+    .head,
+    .body,
+    .comments,
+    .pager {
+      padding-inline: 1.25rem;
+    }
+
+    .crumb {
+      padding-top: 1rem;
+    }
+
+    .crumb-date {
+      display: none;
+    }
+
+    .stamp {
+      margin-top: 1.75rem;
+    }
+
+    h1 {
+      font-size: 3rem;
+    }
+
+    .lead {
+      font-size: 1.3125rem;
+    }
+
+    .facts {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .facts > :nth-child(2n + 1) {
+      padding-left: 0;
+    }
+
+    /* The cover runs to the screen edges on phones; its caption keeps the text margin. */
+    .cover {
+      padding-inline: 0;
+      margin-top: 1.75rem;
+    }
+
+    .cover img {
+      aspect-ratio: 4 / 3;
+    }
+
+    .cover figcaption {
+      padding-inline: 1.25rem;
+    }
+
+    .body {
+      grid-template-columns: minmax(0, 1fr);
+      padding-block: 2rem 1.5rem;
+      font-size: 1.1875rem;
+    }
+
+    .body > :global(*) {
+      grid-column: 1;
+    }
+
+    .body :global(.photo-row) {
+      gap: 0.5rem;
+    }
+
+    .next {
+      grid-template-columns: minmax(0, 1fr) 110px;
+      gap: 1rem;
+    }
+
+    .next-title {
+      font-size: 1.75rem;
+    }
+
+    .mini-globe {
+      width: 110px;
+      height: 110px;
+    }
   }
 
   :global(.pswp__flickr-link) {

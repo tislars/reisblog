@@ -115,16 +115,27 @@ describe('embedFlickrPhotos', () => {
     expect(html).not.toContain('flickr:7');
   });
 
+  it('gives a lone photo its aspect ratio, to cap portrait photos at screen height', async () => {
+    const html = await embedFlickrPhotos('<p>flickr:7</p>', async (id) => photo(id));
+    expect(html).toMatch(/<figure class="photo" style="--ar: \d\.\d{3}">/);
+    expect(html).not.toContain('data-cropped');
+  });
+
+  it('gives every figure a caption, empty when the photo has no title', async () => {
+    const html = await embedFlickrPhotos('<p>flickr:7</p>', async (id) => photo(id, ''));
+    expect(html).toContain('<figcaption></figcaption>');
+  });
+
   it('gives figures a srcset so phones download a smaller size', async () => {
     const html = await embedFlickrPhotos('<p>flickr:7</p>', async (id) => photo(id));
     expect(html).toContain('srcset="https://live.staticflickr.com/7_n.jpg 320w, ');
     expect(html).toContain('7_k.jpg 2048w"');
-    expect(html).toContain('sizes="(min-width: 60rem) 60rem, 100vw"');
+    expect(html).toContain('sizes="(min-width: 1100px) 1020px, 100vw"');
   });
 
   it('sizes photos in a row by their share of the row', async () => {
     const html = await embedFlickrPhotos('<p>flickr:1\nflickr:2</p>', async (id) => photo(id));
-    expect(html.match(/sizes="\(min-width: 60rem\) 30rem, 50vw"/g)).toHaveLength(2);
+    expect(html.match(/sizes="\(min-width: 1100px\) 510px, 50vw"/g)).toHaveLength(2);
   });
 
   it('puts refs on consecutive lines side by side in a row', async () => {
@@ -133,7 +144,9 @@ describe('embedFlickrPhotos', () => {
       async (id) => photo(id),
     );
     expect(html.match(/<div class="photo-row">/g)).toHaveLength(1);
-    expect(html.match(/<figure class="photo" style="flex: 1.501">/g)).toHaveLength(2);
+    expect(html.match(/<figure class="photo">/g)).toHaveLength(2);
+    // Cropped in the row, so PhotoSwipe should not animate from the thumbnail's shape.
+    expect(html.match(/data-cropped="true"/g)).toHaveLength(2);
     expect(html).not.toContain('<p>');
   });
 

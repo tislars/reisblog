@@ -3,6 +3,8 @@ export const SITE_DESCRIPTION = 'Vier maanden onderweg, post voor post op de kaa
 // The part of SITE_DESCRIPTION set in italic vermilion in the homepage headline.
 export const SITE_DESCRIPTION_ACCENT = 'post voor post';
 export const ACCENT = '#e0442b';
+// Rough length of the trip in days, shown as 'DAG 06 / ±120' on posts.
+export const TRIP_DAYS = 120;
 export const HOME = { name: 'Nederland', lat: 52.37, lng: 4.9 };
 export const REPO_URL = 'https://github.com/tislars/reisblog';
 

@@ -35,6 +35,11 @@
   }
 }
 
+html {
+  /* Keeps anchor targets and focused elements clear of the sticky crumb bar on post pages. */
+  scroll-padding-top: 5rem;
+}
+
 html,
 body {
   margin: 0;

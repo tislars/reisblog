@@ -76,16 +76,19 @@ export function srcset(photo: Pick<FlickrPhoto, 'variants'>, maxEdge = Infinity)
     .join(', ');
 }
 
-// Layout widths of photos in a post body (see .body figure.photo in [slug].astro: max 60rem).
+// Layout widths of photos in a post body (see .body in [slug].astro): the 1100px page minus 2 × 40px padding;
+// photos in a row share it equally (the small gap between them is ignored).
+const PAGE_WIDTH = 1020;
 const figureSizes = (perRow: number) =>
-  perRow === 1 ? '(min-width: 60rem) 60rem, 100vw' : `(min-width: 60rem) ${60 / perRow}rem, ${Math.round(100 / perRow)}vw`;
+  `(min-width: ${PAGE_WIDTH + 80}px) ${Math.round(PAGE_WIDTH / perRow)}px, ${Math.round(100 / perRow)}vw`;
 
 function figure(photo: FlickrPhoto, perRow = 1): string {
-  const inRow = perRow > 1;
-  const caption = photo.title ? `<figcaption>${escapeHtml(photo.title)}</figcaption>` : '';
-  // Flex-grow by aspect ratio gives every photo in a row the same height.
-  const style = inRow ? ` style="flex: ${(photo.thumb.width / photo.thumb.height).toFixed(3)}"` : '';
-  return `<figure class="photo"${style}><a href="${escapeHtml(photo.large.src)}" data-pswp-width="${photo.large.width}" data-pswp-height="${photo.large.height}" data-flickr-page="${escapeHtml(photo.pageUrl)}" target="_blank" rel="noopener"><img src="${escapeHtml(photo.thumb.src)}" srcset="${escapeHtml(srcset(photo))}" sizes="${figureSizes(perRow)}" width="${photo.thumb.width}" height="${photo.thumb.height}" alt="${escapeHtml(photo.alt)}" loading="lazy" decoding="async"></a>${caption}</figure>`;
+  // Always a caption, even without a title: the page numbers every figure (FIG. 2, FIG. 3, …) in it.
+  const caption = `<figcaption>${escapeHtml(photo.title)}</figcaption>`;
+  // A lone photo spans the page but no taller than the screen (see [slug].astro); photos in a row are cropped.
+  const ratio = perRow === 1 ? ` style="--ar: ${(photo.thumb.width / photo.thumb.height).toFixed(3)}"` : '';
+  const cropped = perRow > 1 ? ' data-cropped="true"' : '';
+  return `<figure class="photo"${ratio}><a href="${escapeHtml(photo.large.src)}" data-pswp-width="${photo.large.width}" data-pswp-height="${photo.large.height}" data-flickr-page="${escapeHtml(photo.pageUrl)}"${cropped} target="_blank" rel="noopener"><img src="${escapeHtml(photo.thumb.src)}" srcset="${escapeHtml(srcset(photo))}" sizes="${figureSizes(perRow)}" width="${photo.thumb.width}" height="${photo.thumb.height}" alt="${escapeHtml(photo.alt)}" loading="lazy" decoding="async"></a>${caption}</figure>`;
 }
 
 export async function embedFlickrPhotos(
