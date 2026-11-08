@@ -419,9 +419,10 @@ const factColumns = facts.length > 4 ? Math.ceil(facts.length / 2) : facts.lengt
     background: var(--line);
   }
 
-  /* A lone photo spans the page, but a portrait one no taller than the screen (--ar is set per photo). */
-  .body > :global(figure.photo img) {
+  /* A lone photo spans the page, but a portrait one no taller than the screen and centred (--ar is set per photo). */
+  .body > :global(figure.photo) {
     width: min(100%, 85svh * var(--ar, 10));
+    justify-self: center;
   }
 
   .body :global(.photo-row figure.photo img) {
