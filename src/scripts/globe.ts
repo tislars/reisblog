@@ -4,7 +4,6 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url';
 import { distanceKm } from '../lib/geo';
 import { escapeHtml } from '../lib/html';
 import { MAP_COLORS, globeOutlineRadius, graticule, minZoomFor, northCap, paintFor, zoomForGlobeRadius } from '../lib/mapstyle';
-import { snapZoom, stepZoom, zoomLevels } from '../lib/zoom';
 
 interface GlobePost {
   url: string;
@@ -37,9 +36,8 @@ const MIN_ZOOM = 1;
 // Share of the map's shorter side the globe's radius takes on arrival, as in the design.
 const GLOBE_FIT = 0.43;
 const POST_ZOOM = 5;
-const MAX_ZOOM = 15;
-const ZOOM_LEVELS = zoomLevels(MIN_ZOOM, MAX_ZOOM, 8);
-const WHEEL_GESTURE_GAP_MS = 200;
+// City level: closer than this the line-drawn style has little left to show.
+const MAX_ZOOM = 12;
 const VIEW_KEY = 'globe-view';
 const MAX_LEAVES = 100;
 // About 70° of arc from the centre of view: beyond this a point sits close to or behind the globe's edge.
@@ -260,40 +258,6 @@ function bindEvents(map: MapLibreMap, preview: ReturnType<typeof createPreview>)
   });
 }
 
-function bindZoomSteps(map: MapLibreMap) {
-  const container = map.getContainer();
-  const stepAround = (direction: 1 | -1, x: number, y: number) => {
-    const rect = container.getBoundingClientRect();
-    const zoom = stepZoom(ZOOM_LEVELS, map.getZoom(), direction);
-    // Zooming out around the cursor swings the globe's centre latitude and with it the zoom, so only zoom in around it.
-    map.easeTo(direction > 0 ? { zoom, around: map.unproject([x - rect.left, y - rect.top]) } : { zoom });
-  };
-
-  // One step per wheel gesture: a trackpad swipe fires dozens of events, so wait for a pause before stepping again.
-  let gesture: ReturnType<typeof setTimeout> | undefined;
-  container.addEventListener(
-    'wheel',
-    (e) => {
-      e.preventDefault();
-      const busy = gesture !== undefined;
-      clearTimeout(gesture);
-      gesture = setTimeout(() => (gesture = undefined), WHEEL_GESTURE_GAP_MS);
-      if (!busy && e.deltaY !== 0) stepAround(e.deltaY < 0 ? 1 : -1, e.clientX, e.clientY);
-    },
-    { passive: false },
-  );
-  container.addEventListener('dblclick', (e) => stepAround(e.shiftKey ? -1 : 1, e.clientX, e.clientY));
-
-  // Pinch and keyboard zoom freely; settle on the next level in the direction they went.
-  let from = map.getZoom();
-  map.on('zoomstart', () => (from = map.getZoom()));
-  map.on('zoomend', (e) => {
-    if (!e.originalEvent) return;
-    const target = snapZoom(ZOOM_LEVELS, from, map.getZoom());
-    if (target !== map.getZoom()) map.easeTo({ zoom: target });
-  });
-}
-
 export function initGlobe() {
   setWorkerUrl(workerUrl);
   const data = JSON.parse(document.getElementById('globe-data')!.textContent!) as GlobeData;
@@ -309,12 +273,9 @@ export function initGlobe() {
     minZoom: MIN_ZOOM,
     maxZoom: MAX_ZOOM,
     maxPitch: 0, // the rim assumes a straight-down view
-    scrollZoom: false,
-    doubleClickZoom: false,
     attributionControl: { compact: true },
   });
   const preview = createPreview(data.posts);
-  bindZoomSteps(map);
 
   map.on('style.load', () => {
     map.setProjection({ type: 'globe' });
