@@ -275,6 +275,8 @@ export function initGlobe() {
     maxPitch: 0, // the rim assumes a straight-down view
     attributionControl: { compact: true },
   });
+  // Tame the spin after a flick; defaults are maxSpeed 1400, deceleration 2500.
+  map.dragPan.enable({ maxSpeed: 500, deceleration: 4000 });
   const preview = createPreview(data.posts);
 
   map.on('style.load', () => {
