@@ -16,6 +16,8 @@ const markers = await Promise.all(
       place: post.entry.data.place,
       placeName: placeName(post.entry.data.place),
       date: formatDate(post.entry.data.date),
+      isoDate: post.entry.data.date.toISOString().slice(0, 10),
+      shortDate: post.entry.data.date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', timeZone: 'UTC' }),
       day: post.day,
       lat: post.lat,
       lng: post.lng,
@@ -66,6 +68,7 @@ const headline =
                       <span class="d">{dayLabel(m.day)}</span>
                       <span class="p">{m.placeName}</span>
                       <span class="c">{formatLat(m.lat)}</span>
+                      <time class="c" datetime={m.isoDate}>{m.shortDate}</time>
                       <span class="t">{m.title}</span>
                     </a>
                   </li>

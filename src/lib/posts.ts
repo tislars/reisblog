@@ -21,7 +21,7 @@ export const withBase = (path: string) => `${import.meta.env.BASE_URL.replace(/\
 export const placeName = (place: string) => place.split(',')[0].trim();
 
 export const formatDate = (date: Date) =>
-  date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' });
+  date.toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 async function toPost(entry: PostEntry, start: Date): Promise<Post> {
   const { date, cover } = entry.data;
