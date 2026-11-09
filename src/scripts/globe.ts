@@ -200,7 +200,7 @@ function createPreview(posts: GlobePost[]) {
 }
 
 /** Hovering or focusing a row in the index marks its post on the globe. */
-function bindIndex(map: MapLibreMap, data: GlobeData) {
+function bindIndex(map: MapLibreMap, data: GlobeData, preview: ReturnType<typeof createPreview>) {
   const source = map.getSource<GeoJSONSource>('focus')!;
   let marked: string | undefined;
 
@@ -233,6 +233,15 @@ function bindIndex(map: MapLibreMap, data: GlobeData) {
     index.addEventListener('mouseleave', () => mark(focused()));
     index.addEventListener('focusin', (e) => mark(row(e.target)?.dataset.post));
     index.addEventListener('focusout', (e) => mark(row((e as FocusEvent).relatedTarget)?.dataset.post));
+    index.addEventListener('click', (e) => {
+      const me = e as MouseEvent;
+      const post = data.posts.find((p) => p.url === row(e.target)?.dataset.post);
+      // Modified clicks keep their new-tab/window behaviour.
+      if (!post || me.button !== 0 || me.metaKey || me.ctrlKey || me.shiftKey || me.altKey) return;
+      e.preventDefault();
+      map.flyTo({ center: lngLat(post), zoom: Math.max(map.getZoom(), POST_ZOOM), duration: 1500 });
+      preview.show([post]);
+    });
   });
 }
 
@@ -293,7 +302,7 @@ export function initGlobe() {
     addRim(map);
     map.getContainer().closest('.map')?.classList.add('ready');
     bindEvents(map, preview);
-    bindIndex(map, data);
+    bindIndex(map, data, preview);
     const latest = data.posts.at(-1);
     if (latest) {
       const el = document.createElement('button');
