@@ -272,7 +272,7 @@ export function initGlobe() {
   const data = JSON.parse(document.getElementById('globe-data')!.textContent!) as GlobeData;
   const requested = new URLSearchParams(location.search).get('post');
   const focus = data.posts.find((p) => p.url === requested) ?? data.posts.at(-1) ?? data.home;
-  const saved = readView();
+  const saved = requested ? readView() : undefined;
 
   const map = new MapLibreMap({
     container: 'globe',
